@@ -1,0 +1,84 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extName__",
+  "version": "0.11.32",
+  "version_name": "0.11.32",
+  "description": "__MSG_extDescription__",
+  "default_locale": "en",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "downloads",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://images.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*"
+  ],
+  "action": {
+    "default_title": "__MSG_actionTitle__",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "js": [
+        "locales/en.js",
+        "locales/zh_CN.js",
+        "locales/zh_TW.js",
+        "locales/ja.js",
+        "locales/ko.js",
+        "locales/es.js",
+        "locales/pt_BR.js",
+        "locales/fr.js",
+        "locales/de.js",
+        "locales/ru.js",
+        "i18n.js",
+        "jszip.min.js",
+        "marked.min.js",
+        "fast-text.js",
+        "dil-render.js",
+        "html-export.js",
+        "obsidian-send.js",
+        "settings.js",
+        "ui-kit.js",
+        "resident.js",
+        "fast-content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "toggle-sidebar": {
+      "suggested_key": {
+        "default": "Alt+Shift+E"
+      },
+      "description": "__MSG_cmdToggleSidebar__"
+    }
+  },
+  "sandbox": {
+    "pages": [
+      "sandbox.html"
+    ]
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "sandbox.html",
+        "print.html"
+      ],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ]
+    }
+  ]
+}

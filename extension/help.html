@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Chat &amp; Intelligent UI Exporter for ChatGPT</title>
+<style>
+html,body{margin:0}
+body.cx{background:var(--bg)}
+.help{max-width:680px;margin:40px auto 56px;padding:0 16px}
+.helph{display:flex;align-items:center;gap:10px}
+.helph h1{flex:1;font-size:18px;font-weight:600;margin:0}
+.lead{color:var(--muted);font-size:13.5px;margin:8px 0 24px 36px}
+section{background:var(--surface);border-radius:24px;padding:24px 26px 26px;margin-bottom:18px;scroll-margin-top:16px}
+section:target{box-shadow:0 0 0 2px var(--pri)}
+h2{font-size:17px;font-weight:600;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+p{font-size:14px;line-height:1.75;margin:0}
+code{font:12.5px ui-monospace,Consolas,monospace;background:var(--bg);border-radius:5px;padding:1px 5px}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0 0}
+@media (max-width:560px){.cmp{grid-template-columns:1fr}}
+.opt{border-radius:16px;background:var(--bg);padding:14px 16px}
+.opt b{display:block;font-size:14px;margin-bottom:4px}
+.opt p{font-size:13px;line-height:1.65;color:color-mix(in srgb,var(--text) 85%,var(--bg))}
+.see{margin-top:12px;background:var(--surface);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.see.quote{background:var(--bg);margin-top:10px}
+.see.mono{font:12px/1.6 ui-monospace,Consolas,monospace;color:var(--muted)}
+.see details summary{cursor:pointer;font-weight:600}
+.row{display:flex;gap:10px;align-items:center}
+.row+.row{margin-top:8px}
+.pic{width:44px;height:33px;border-radius:6px;flex:none;background:linear-gradient(135deg,var(--tint),var(--acc))}
+.pic.b{background:linear-gradient(135deg,var(--pri),var(--tint))}
+table.t{border-collapse:collapse;width:100%}
+table.t td{border:1px solid var(--line);padding:5px 7px;vertical-align:middle}
+.note{font-size:12.5px;color:var(--muted);margin-top:14px;line-height:1.65}
+.pick{margin-top:16px;border-radius:12px;background:color-mix(in srgb,var(--pri) 12%,var(--surface));padding:11px 14px;font-size:14px;line-height:1.65}
+.pick b{color:var(--pri-deep)}
+.foot{font-size:12px;color:var(--muted);text-align:center;margin-top:24px}
+</style></head>
+<body data-page="help">
+<main class="help">
+<div class="helph"><div class="logo" id="logo"></div><h1 data-i18n="help.title"></h1><span class="xver" id="ver"></span></div>
+<p class="lead" data-i18n="help.lead"></p>
+
+<section id="prose-html">
+<h2 data-i18n="set.proseHtml"></h2>
+<p data-i18n-html="help.prose.intro"></p>
+<div class="see mono quote">&lt;details&gt;&lt;summary&gt;<span data-i18n="help.prose.sample"></span>&lt;/summary&gt;T = 9550 × P / n&lt;/details&gt;</div>
+<div class="cmp">
+<div class="opt"><b data-i18n="set.proseHtml.escapeShort"></b><p data-i18n="help.prose.escape"></p>
+<div class="see mono">&lt;details&gt;&lt;summary&gt;<span data-i18n="help.prose.sample"></span>&lt;/summary&gt;T = 9550 × P / n&lt;/details&gt;</div></div>
+<div class="opt"><b data-i18n="set.proseHtml.keepShort"></b><p data-i18n="help.prose.keep"></p>
+<div class="see"><details><summary data-i18n="help.prose.sample"></summary>T = 9550 × P / n</details></div></div>
+</div>
+<p class="note" data-i18n="help.prose.note"></p>
+<div class="pick"><b data-i18n="help.how"></b><span data-i18n="help.prose.pick"></span></div>
+</section>
+
+<section id="html-cards">
+<h2><span data-i18n="set.htmlCards"></span> <span class="beta">Beta</span></h2>
+<p data-i18n="help.cards.intro"></p>
+<div class="cmp">
+<div class="opt"><b data-i18n="help.cards.off"></b><p data-i18n="help.cards.offText"></p>
+<div class="see"><table class="t"><tr><td style="width:52px"><div class="pic"></div></td><td>ESP32-S3</td></tr><tr><td><div class="pic b"></div></td><td>STM32 Nucleo</td></tr></table></div></div>
+<div class="opt"><b data-i18n="help.cards.on"></b><p data-i18n="help.cards.onText"></p>
+<div class="see"><div class="row"><div class="pic"></div><span>ESP32-S3</span></div><div class="row"><div class="pic b"></div><span>STM32 Nucleo</span></div></div></div>
+</div>
+<p class="note" data-i18n="help.cards.note"></p>
+<div class="pick"><b data-i18n="help.how"></b><span data-i18n="help.cards.pick"></span></div>
+</section>
+<p class="foot" data-i18n="help.foot"></p>
+</main>
+<script src="locales/en.js"></script>
+<script src="locales/zh_CN.js"></script>
+<script src="locales/zh_TW.js"></script>
+<script src="locales/ja.js"></script>
+<script src="locales/ko.js"></script>
+<script src="locales/es.js"></script>
+<script src="locales/pt_BR.js"></script>
+<script src="locales/fr.js"></script>
+<script src="locales/de.js"></script>
+<script src="locales/ru.js"></script>
+<script src="i18n.js"></script>
+<script src="settings.js"></script>
+<script src="ui-kit.js"></script>
+<script src="help.js"></script>
+</body>
+</html>

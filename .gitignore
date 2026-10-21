@@ -1,0 +1,14 @@
+node_modules/
+.ua/
+work/
+tmp/
+research/
+/fixtures/
+tests/fixtures/
+Output - test 1/
+releases/
+.env
+.env.*
+*.log
+archive/
+Output/

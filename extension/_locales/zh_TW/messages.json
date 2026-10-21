@@ -1,0 +1,18 @@
+{
+  "extName": {
+    "message": "Chat & Intelligent UI Exporter for ChatGPT",
+    "description": "Extension name (the same in every language)."
+  },
+  "extDescription": {
+    "message": "把 ChatGPT 對話匯出為 Markdown、HTML 或 PDF，保留原圖和互動卡片。所有內容都在本機處理。",
+    "description": "Store and chrome://extensions description, at most 132 characters."
+  },
+  "actionTitle": {
+    "message": "Chat & Intelligent UI Exporter for ChatGPT",
+    "description": "Tooltip of the toolbar button."
+  },
+  "cmdToggleSidebar": {
+    "message": "開啟 / 關閉匯出側邊欄",
+    "description": "Description of the Alt+Shift+E shortcut in chrome://extensions/shortcuts."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "extName": {
+    "message": "Chat & Intelligent UI Exporter for ChatGPT",
+    "description": "Extension name (the same in every language)."
+  },
+  "extDescription": {
+    "message": "ChatGPT-Chats als Markdown, HTML oder PDF exportieren – mit Originalbildern und interaktiven Karten. Alles bleibt auf deinem PC.",
+    "description": "Store and chrome://extensions description, at most 132 characters."
+  },
+  "actionTitle": {
+    "message": "Chat & Intelligent UI Exporter for ChatGPT",
+    "description": "Tooltip of the toolbar button."
+  },
+  "cmdToggleSidebar": {
+    "message": "Export-Seitenleiste öffnen / schließen",
+    "description": "Description of the Alt+Shift+E shortcut in chrome://extensions/shortcuts."
+  }
+}

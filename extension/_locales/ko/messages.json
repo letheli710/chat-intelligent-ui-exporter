@@ -1,0 +1,18 @@
+{
+  "extName": {
+    "message": "Chat & Intelligent UI Exporter for ChatGPT",
+    "description": "Extension name (the same in every language)."
+  },
+  "extDescription": {
+    "message": "ChatGPT 대화를 Markdown, HTML, PDF로 내보내고 원본 이미지와 대화형 카드도 저장합니다. 모든 처리는 내 컴퓨터에서 이루어집니다.",
+    "description": "Store and chrome://extensions description, at most 132 characters."
+  },
+  "actionTitle": {
+    "message": "Chat & Intelligent UI Exporter for ChatGPT",
+    "description": "Tooltip of the toolbar button."
+  },
+  "cmdToggleSidebar": {
+    "message": "내보내기 사이드바 열기 / 닫기",
+    "description": "Description of the Alt+Shift+E shortcut in chrome://extensions/shortcuts."
+  }
+}
