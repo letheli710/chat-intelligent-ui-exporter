@@ -32,19 +32,41 @@
   const ALLOWED = new Set(['a','abbr','b','bdi','bdo','blockquote','br','caption','center','cite','code','col','colgroup','dd','del','details','dfn','div','dl','dt','em','figcaption','figure','font','h1','h2','h3','h4','h5','h6','hr','i','img','input','ins','kbd','li','mark','ol','p','pre','q','rp','rt','ruby','s','samp','small','span','strike','strong','sub','summary','sup','table','tbody','td','tfoot','th','thead','tr','tt','u','ul','var','wbr','x-slot', ...SVG_ELEMENTS.map(t => t.toLowerCase()), ...MATH_ELEMENTS]);
   const DROPPED = new Set(['script','style','iframe','frame','frameset','object','embed','applet','link','meta','base','template','noscript','portal','audio','video','source','track','canvas','dialog','select','textarea','button','form','option','title']);
   const URL_ATTRS = new Set(['href','src','xlink:href','action','formaction','poster','background','cite','data']);
+  // Where something the reader would have seen is removed, a dashed box says what and why, and links
+  // to that section of docs/html-filter.md. Technical notes, so English only, like an HTTP error page.
+  // Things that never showed (scripts, styles, meta) go silently.
+  const FILTER_DOC = 'https://github.com/letheli710/chat-intelligent-ui-exporter/blob/main/docs/html-filter.md';
+  const FILTER_NOTES = {
+    'embedded-pages': {what:'embedded page', why:'Embedded pages and objects can run their own code inside this file, so they are not kept.'},
+    media: {what:'audio or video player', why:'Players load and run content from the web, so they are not kept.'},
+    canvas: {what:'canvas', why:'A canvas is drawn by a script, and scripts are not kept, so it would stay empty.'},
+    forms: {what:'form control', why:'Forms and buttons from the chat do nothing outside ChatGPT, so they are not kept.'},
+    links: {what:'link address', why:'Only web (http, https), mailto and local file links are kept; this one would run code or open something the page cannot check, so only its text is kept.'},
+  };
+  const NOTED = {iframe:'embedded-pages', frame:'embedded-pages', frameset:'embedded-pages', portal:'embedded-pages', object:'embedded-pages', embed:'embedded-pages', applet:'embedded-pages',
+    audio:'media', video:'media', canvas:'canvas', form:'forms', button:'forms', select:'forms', textarea:'forms', dialog:'forms'};
+  function filterNotice(doc, tag, key) {
+    const note = FILTER_NOTES[key], box = doc.createElement('details'), summary = doc.createElement('summary'), why = doc.createElement('div'), more = doc.createElement('a');
+    box.className = 'fx-box';summary.textContent = `Removed: <${tag}> — ${note.what}`;why.className = 'why';
+    more.href = `${FILTER_DOC}#${key}`;more.target = '_blank';more.rel = 'noopener noreferrer';more.textContent = 'Learn more →';
+    why.append(note.why + ' ', more);box.append(summary, why);return box;
+  }
   function sanitize(html, doc, nonce) {
     const tpl = doc.createElement('template');tpl.innerHTML = html;
     (function clean(node) {
       for (const el of [...node.children]) {
-        const tag = el.localName;
-        if (DROPPED.has(tag) || (tag === 'x-slot' && el.getAttribute('data-k') !== nonce)) {el.remove();continue;}
+        const tag = el.localName, isHtml = el.namespaceURI === 'http://www.w3.org/1999/xhtml';
+        if (DROPPED.has(tag) || (tag === 'x-slot' && el.getAttribute('data-k') !== nonce)) {if (isHtml && NOTED[tag]) el.replaceWith(filterNotice(doc, tag, NOTED[tag]));else el.remove();continue;}
         if (!ALLOWED.has(tag) && !ALLOWED.has(tag.toLowerCase())) {clean(el);el.replaceWith(...el.childNodes);continue;}
+        let linkGone = false;
         for (const at of [...el.attributes]) {
           const name = at.name.toLowerCase(), value = at.value.trim(), url = urlAsRead(at.value);
           if (/^on/.test(name) || name === 'srcdoc' || name === 'formaction' || name === 'action') el.removeAttribute(at.name);
           else if (name === 'style' && /javascript:|expression\s*\(|url\s*\(|@import/i.test(value)) el.removeAttribute(at.name);
-          else if (URL_ATTRS.has(name) && !(isLocal(url) || /^(https?:|mailto:|#)/i.test(url) || /^data:image\/(png|jpe?g|gif|webp);/i.test(url) || (tag === 'a' && el.hasAttribute('download') && /^data:/i.test(url)))) el.removeAttribute(at.name);
+          else if (URL_ATTRS.has(name) && !(isLocal(url) || /^(https?:|mailto:|#)/i.test(url) || /^data:image\/(png|jpe?g|gif|webp);/i.test(url) || (tag === 'a' && el.hasAttribute('download') && /^data:/i.test(url)))) {el.removeAttribute(at.name);linkGone ||= tag === 'a' && name === 'href';}
         }
+        // The text stays, marked with a dashed underline; hovering says why, clicking opens the section.
+        if (linkGone && isHtml) {const note = FILTER_NOTES.links;el.className = 'fx-inline';el.title = `Removed: ${note.what}. ${note.why}`;el.href = `${FILTER_DOC}#links`;el.target = '_blank';el.rel = 'noopener noreferrer';el.removeAttribute('download');}
         if (tag === 'input') {if (el.getAttribute('type') !== 'checkbox') {el.remove();continue;}el.setAttribute('disabled', '');}
         clean(el);
       }
@@ -312,6 +334,8 @@ figure.map.map-online .map-shot,figure.map.map-online .map-missing{display:none}
 .map-credit{position:absolute;right:0;bottom:0;padding:1px 6px;background:rgba(255,255,255,.85);font-size:10px;color:#555}
 figure.map figcaption{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:13px;color:var(--muted);background:#fff}
 details.info{display:inline}details.info>summary{display:inline;list-style:none;cursor:pointer;color:var(--faint)}details.info>summary::-webkit-details-marker{display:none}details.info[open]>div{margin-top:4px;font-size:12px;line-height:1.6}
+.fx-box{margin:0 0 16px;border:1px dashed #d8cfb7;border-radius:10px;background:#fcfaf4;color:#6d6040;font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.fx-box>summary{cursor:pointer;padding:8px 14px;list-style:none}.fx-box>summary::-webkit-details-marker{display:none}.fx-box>summary::before{content:"▸ ";color:#a89668}.fx-box[open]>summary::before{content:"▾ "}.fx-box .why{padding:0 14px 10px 28px;font-family:-apple-system,"Segoe UI",system-ui,sans-serif}.fx-box .why a{color:inherit}
+.md a.fx-inline{text-decoration:none;border-bottom:1px dashed #c9b98d;color:#7a6a3c;cursor:help}
 footer.notes{margin-top:48px;border-top:1px solid var(--border);padding-top:16px;color:var(--muted);font-size:14px}footer.notes h2{font-size:15px;margin:0 0 8px;color:var(--text)}footer.notes ul{padding-left:22px;margin:0 0 12px}
 .lightbox{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.82);cursor:zoom-out}.lightbox img{max-width:96vw;max-height:96vh;border-radius:6px;background:#fff}
 @media print{.card-frame,.ab-frame,.map-live,.map-load,.code-head button,.ab-open{display:none!important}figure.map .map-shot,figure.map .map-missing{display:block!important}.card-host.live .card-static{display:block!important}.ab-poster{display:block;max-width:100%}.page{max-width:none}}`;
