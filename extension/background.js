@@ -39,6 +39,8 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
       return {type: response.headers.get('content-type') || '', data: btoa(binary)};
     }
     if (message.type === 'open:shortcuts') return {tab: (await chrome.tabs.create({url: 'chrome://extensions/shortcuts'})).id};
+    // The keys Chrome really bound (a page script cannot ask chrome.commands itself).
+    if (message.type === 'commands:get') return {commands: (await chrome.commands.getAll()).map(({name, shortcut}) => ({name, shortcut}))};
     // The explanation page behind the ⓘ of 折叠块等特殊标签 and 图文卡片用 HTML.
     if (message.type === 'open:help') {
       if (!['prose-html', 'html-cards'].includes(message.topic)) throw Error(t('bg.noHelp'));

@@ -92,7 +92,8 @@ test('the print page is a web-accessible extension page; permissions are the pan
   const m = JSON.parse(fs.readFileSync('extension/manifest.json', 'utf8'));
   assert.ok(m.web_accessible_resources[0].resources.includes('print.html'));
   // storage: the settings shared by the sidebar, the toolbar panel and the settings tab; the ChatGPT hosts as the content scripts.
-  assert.deepEqual(m.permissions, ['activeTab', 'scripting', 'downloads', 'storage']);assert.deepEqual(m.host_permissions, ['https://images.openai.com/*', 'https://chatgpt.com/*', 'https://chat.openai.com/*']);
+  // No activeTab: the toolbar panel and the shortcut act only on ChatGPT tabs, which the host permissions already cover.
+  assert.deepEqual(m.permissions, ['scripting', 'downloads', 'storage']);assert.deepEqual(m.host_permissions, ['https://images.openai.com/*', 'https://chatgpt.com/*', 'https://chat.openai.com/*']);
   const page = fs.readFileSync('extension/print.html', 'utf8');
   for (const s of ['marked.umd.js', 'dil-render.js', 'pdf-export.js']) {assert.match(page, new RegExp(`<script src="${s}"></script>`));assert.ok(fs.existsSync(`extension/${s}`));}
   assert.doesNotMatch(page, /<script>(?!<)/, 'no inline script (extension pages forbid it)');

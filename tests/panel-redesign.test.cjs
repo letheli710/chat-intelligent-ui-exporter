@@ -164,6 +164,23 @@ test('the ⓘ of 折叠块等特殊标签 and 图文卡片用 HTML open their ex
   for(const topic of opened){assert.match(help,new RegExp(`<section id="${topic}">`));assert.ok(background.includes(`'${topic}'`),topic);}
   for(const s of ['settings.js','ui-kit.js','help.js'])assert.match(help,new RegExp(`<script src="${s}"></script>`));
 });
+test('侧边栏快捷键 shows the key Chrome bound, says when there is none, and when it sits on the toolbar-panel row',async()=>{
+  const {w}=settingsPage(),store=w.ChatExportSettings.open();await store.ready;const t=w.ChatExportI18n.t;
+  let commands=[{name:'_execute_action',shortcut:''},{name:'toggle-sidebar',shortcut:'Ctrl+Shift+Y'}];
+  let asked=0;const box=w.document.getElementById('box'),panel=w.ChatExportUI.mountSettings(box,store,{commands:async()=>{asked++;return commands;}});
+  // Asked only once its group is open, and again each time it opens.
+  const shown=async()=>{panel.setOpen('btns',false);panel.setOpen('btns',true);await new Promise(r=>setTimeout(r,0));return box.querySelector('[data-row="shortcut"] .val').textContent;};
+  await new Promise(r=>setTimeout(r,0));assert.equal(asked,0);
+  assert.equal(await shown(),t('set.shortcut.value','Ctrl+Shift+Y'));
+  // Chrome left it empty (not a first install, or the keys were taken).
+  commands=[{name:'_execute_action',shortcut:''},{name:'toggle-sidebar',shortcut:''}];
+  assert.equal(await shown(),t('set.shortcut.none'));
+  // The key was put on Chrome's own row, which opens the toolbar panel.
+  commands=[{name:'_execute_action',shortcut:'Alt+Shift+E'},{name:'toggle-sidebar',shortcut:''}];
+  assert.equal(await shown(),t('set.shortcut.onAction','Alt+Shift+E'));assert.match(await shown(),/Alt\+Shift\+E/);
+  // The background answers the sidebar's question with Chrome's list.
+  assert.match(fs.readFileSync('extension/background.js','utf8'),/'commands:get'[^\n]*chrome\.commands\.getAll\(\)/);
+});
 test('the toolbar panel and the settings tab are extension pages; the manifest keeps the panel on ChatGPT',()=>{
   const m=JSON.parse(fs.readFileSync('extension/manifest.json','utf8'));
   assert.equal(m.action.default_popup,'popup.html');assert.equal(m.options_page,'options.html');

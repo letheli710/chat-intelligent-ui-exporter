@@ -88,6 +88,27 @@ test('with Obsidian as the export kind, 保存到 Obsidian streams the ZIP\'s Ma
   s.getElementById('obsFolder').click();await new Promise(r=>setTimeout(r,5));assert.equal(opened.at(-1).type,'obsidian:setup');
   dom.window.close();
 });
+test('saved note links move from the page\'s localStorage to chrome.storage.local once, and new ones are kept there',async()=>{
+  const dom=new JSDOM('<div></div>',{url:'https://chatgpt.com/c/chat',runScripts:'outside-only'}),w=dom.window;
+  w.fetch=async path=>{if(path==='/api/auth/session')return {ok:true,json:async()=>({accessToken:'t'})};
+    return {ok:true,json:async()=>({title:'对话',current_node:'a',mapping:{a:{parent:null,children:[],message:{id:'a',author:{role:'assistant'},content:{content_type:'text',parts:['答']}}}}})};};
+  // chrome.storage.local as Chrome keeps it; another tab saved a link for "other" meanwhile.
+  const stored={chatExportObsidianNotes:{other:'obsidian://open?file=other'}},changed=[];
+  const area={get:async k=>JSON.parse(JSON.stringify(k==null?stored:k in stored?{[k]:stored[k]}:{})),set:async o=>{Object.assign(stored,JSON.parse(JSON.stringify(o)));},remove:async ks=>{for(const k of [].concat(ks))delete stored[k];}};
+  w.chrome={runtime:{sendMessage:async()=>({}),onConnect:{addListener(){}}},storage:{local:area,onChanged:{addListener:f=>changed.push(f)}}};
+  w.localStorage.setItem('chatExportObsidianNotes',JSON.stringify({chat:'obsidian://open?file=old'}));
+  w.localStorage.setItem('chatExport.exportKind',JSON.stringify('obsidian'));
+  for(const f of ['fast-text.js','settings.js','ui-kit.js','obsidian-send.js','fast-content.js'])w.eval(fs.readFileSync(`extension/${f}`,'utf8'));
+  const s=w.document.querySelector('[data-archive-owned="fast-text"]').shadowRoot;
+  for(let i=0;i<100&&s.getElementById('obsOpen').disabled;i++)await new Promise(r=>setTimeout(r,5));
+  // The old link opens this chat's note, now from extension storage; the page no longer holds it.
+  assert.equal(s.getElementById('obsOpen').disabled,false);assert.equal(w.localStorage.getItem('chatExportObsidianNotes'),null);
+  assert.deepEqual(stored.chatExportObsidianNotes,{other:'obsidian://open?file=other',chat:'obsidian://open?file=old'});
+  // A link removed in another tab turns 打开 off here too.
+  stored.chatExportObsidianNotes={};changed.forEach(f=>f({chatExportObsidianNotes:{newValue:{}}},'local'));
+  assert.equal(s.getElementById('obsOpen').disabled,true);
+  dom.window.close();
+});
 test('extension files hold no characters Chrome refuses to load ("isn\'t UTF-8 encoded")',()=>{
   // Noncharacters (U+FDD0–U+FDEF, U+FFFE, U+FFFF) and lone surrogates make Chrome refuse the whole
   // extension; write them as \u escapes in source instead.

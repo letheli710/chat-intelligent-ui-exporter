@@ -114,6 +114,19 @@ test('prose HTML kept as is loses scripts, event attributes and script URLs; SVG
   assert.doesNotMatch(out, /script|onclick|onload|javascript:|iframe|x-slot/);
   assert.match(out, /<svg viewBox="0 0 1 1"><circle r="1"><\/circle><\/svg>/);assert.match(out, /<a>b<\/a>/);assert.match(out, /<img src="https:\/\/e\.x\/a\.png">/);
 });
+test('script URLs hidden by tabs, line breaks or control characters are removed too', () => {
+  const {sanitize} = require('../extension/html-export');
+  const doc = new JSDOM('').window.document;
+  // Browsers read every one of these hrefs as a script URL.
+  const hidden = ['java&#9;script:x()', 'java&#10;script:x()', 'java&#13;script:x()', 'java\tscript:x()', ' &#1;javascript:x()', 'jav&#x09;ascript:x()', 'JaVa&#9;ScRiPt:x()', 'vb&#9;script:x()', 'da&#9;ta:text/html,x'];
+  for (const href of hidden) {
+    const out = sanitize(`<a href="${href}">a</a><svg><a href="${href}"><text>b</text></a><a xlink:href="${href}"><text>c</text></a><use href="${href}"></use></svg>`, doc, 'real');
+    assert.doesNotMatch(out, /href/, href);
+  }
+  // Ordinary links, local files and inline pictures are kept as they were.
+  const kept = sanitize('<a href="https://e.x/a">a</a><a href="files/a.csv">b</a><a href="#n">c</a><img src="data:image/png;base64,AA=="><svg><a href="https://e.x/b"><text>d</text></a></svg>', doc, 'real');
+  assert.match(kept, /href="https:\/\/e\.x\/a"/);assert.match(kept, /href="files\/a\.csv"/);assert.match(kept, /href="#n"/);assert.match(kept, /src="data:image\/png;base64,AA=="/);assert.match(kept, /href="https:\/\/e\.x\/b"/);
+});
 test('toHtml without options is unchanged by the live mode; live controls carry handler numbers', () => {
   const dil = {code:'const [v,setV]=DIL.useState(3,{key:"v"});DIL.render(__dil.jsx("card",null,__dil.jsx("slider",{"min":0,"max":10,"value":v,"onChange":setV}),__dil.jsx("link",{"href":"https://a.example/?utm_source=chatgpt.com"},"链接")))'};
   const tree = render.evaluate(dil, exec);

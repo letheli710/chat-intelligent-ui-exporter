@@ -70,7 +70,9 @@
     {key:'btns',title:t('set.btns'),summary:v=>v.dockShow?t('set.btns.shown',v.dockPos==='corner'?t('set.dockPos.corner'):t('set.dockPos.input')):t('set.btns.hidden'),rows:[
       {key:'dockShow',label:t('set.dockShow'),value:onOff('set.dockShow.on','set.dockShow.off'),control:'switch'},
       {key:'dockPos',label:t('set.dockPos'),dep:true,dim:v=>!v.dockShow,value:v=>v.dockPos==='corner'?t('set.dockPos.corner'):t('set.dockPos.input'),control:'seg',options:[['input',t('set.dockPos.inputShort')],['corner',t('set.dockPos.cornerShort')]]},
-      {key:'shortcut',label:t('set.shortcut'),tip:'shortcut',value:()=>t('set.shortcut.value'),control:'button',text:t('set.shortcut.button')},
+      // What Chrome really bound (ctx.keys, read by mountSettings): Chrome gives the suggested
+      // Alt+Shift+E only on a first install, and a key put on its own toolbar-panel row opens that instead.
+      {key:'shortcut',label:t('set.shortcut'),tip:'shortcut',value:(v,ctx)=>!ctx.keys?'':ctx.keys.sidebar?t('set.shortcut.value',ctx.keys.sidebar):ctx.keys.action?t('set.shortcut.onAction',ctx.keys.action):t('set.shortcut.none'),control:'button',text:t('set.shortcut.button')},
     ]},
     {key:'adv',title:t('set.adv'),summary:v=>v.uiFolder?t('set.adv.uiOn'):t('set.adv.summary'),rows:[
       {key:'uiFolder',label:t('set.uiFolder'),tip:'ui',value:onOff('set.uiFolder.on'),control:'switch'},
@@ -121,7 +123,14 @@
       heads.push({g,acc});wrap.append(acc);
     }
     container.append(wrap);
-    const setOpen=(key,on)=>{const h=heads.find(x=>x.g.key===key);if(!h)return;h.acc.classList.toggle('open',on);h.acc.querySelector('.accb').hidden=!on;h.acc.querySelector('.acch').setAttribute('aria-expanded',String(on));};
+    const keysHead=heads.find(x=>x.g.rows.some(r=>r.key==='shortcut'));
+    const setOpen=(key,on)=>{const h=heads.find(x=>x.g.key===key);if(!h)return;h.acc.classList.toggle('open',on);h.acc.querySelector('.accb').hidden=!on;h.acc.querySelector('.acch').setAttribute('aria-expanded',String(on));
+      if(on&&h===keysHead)readKeys();};
+    // 侧边栏快捷键: ctx.commands() gives chrome.commands.getAll(). Read when its group opens, and again
+    // when the page comes back into view (after 更改 in chrome://extensions/shortcuts).
+    function readKeys(){if(!c.commands)return;
+      Promise.resolve().then(()=>c.commands()).then(list=>{const key=name=>list?.find(x=>x.name===name)?.shortcut||'';c.keys={sidebar:key('toggle-sidebar'),action:key('_execute_action')};refresh();},()=>{});}
+    const shown=()=>{if(doc.visibilityState==='visible'&&keysHead?.acc.classList.contains('open'))readKeys();};doc.addEventListener('visibilitychange',shown);
     open.forEach(k=>setOpen(k,true));
     wrap.addEventListener('click',e=>{const help=e.target.closest('[data-help]');if(help){c.help?.(help.dataset.help);return;}
       const head=e.target.closest('.acch');if(head){const k=head.parentElement.dataset.group;setOpen(k,!head.parentElement.classList.contains('open'));return;}
@@ -145,7 +154,7 @@
       for(const {g,acc} of heads)acc.querySelector('.acch .val').textContent=g.summary(v);
     }
     refresh();const off=store.onChange(v=>refresh(v));
-    return {el:wrap,refresh,setOpen,destroy:()=>{off();wrap.remove();}};
+    return {el:wrap,refresh,setOpen,destroy:()=>{off();doc.removeEventListener('visibilitychange',shown);wrap.remove();}};
   }
   function exampleName(v){const ext={md:'md',zip:'zip',html:v.htmlForm==='single'?'html':'html.zip',pdf:'pdf',obsidian:'md'}[v.exportKind];return `${S.fileBase(v,{title:t('set.exampleTitle')})}.${ext}`;}
 
