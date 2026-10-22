@@ -8,13 +8,17 @@
   // Two forms with the same page: "folder" (conversation.html + assets/ + files/, zipped by the
   // panel) and "single" (one file, every asset a data: URL). Opened from file://, a page cannot
   // fetch its neighbours, so all data the page needs is inside it and frames use srcdoc.
-  // Nothing is loaded from the network except map tiles, and only when the reader is online.
+  // The page loads map tiles only when the reader asks for the online map; web pictures, and
+  // anything an embedded app or the chat's own HTML points to, load as in any web page.
   const escapeHtml = text => String(text ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'})[c]);
   // JSON inside <script type="application/json">: nothing in it can end the element.
   const jsonScript = value => JSON.stringify(value).replace(new RegExp('[<>&\u2028\u2029]', 'g'), c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
   const safeName = id => String(id).replace(/[^\w-]/g, '_');
   const stripTracking = url => String(url).replace(/\?utm_source=chatgpt\.com&/, '?').replace(/[?&]utm_source=chatgpt\.com(?![\w%.~-])/, '');
-  const isLocal = href => !!href && !/^(?:[a-z][\w+.-]*:|#|\/\/)/i.test(href);
+  // Browsers drop tabs and line breaks inside a URL and control characters at its ends, so
+  // "java&#9;script:" opens as javascript:. Schemes are checked on the URL with all of them removed.
+  const urlAsRead = href => String(href ?? '').replace(/[\u0000- \u007f]/g, '');
+  const isLocal = href => {const url = urlAsRead(href);return !!url && !/^(?:[a-z][\w+.-]*:|#|\/\/)/i.test(url);};
   const blobDataUrl = blob => new Promise((ok, fail) => {const reader = new root.FileReader();reader.onload = () => ok(String(reader.result));reader.onerror = () => fail(reader.error);reader.readAsDataURL(blob);});
   const MIME = {png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', webp:'image/webp', svg:'image/svg+xml', csv:'text/csv', json:'application/json', pdf:'application/pdf', txt:'text/plain', html:'text/html'};
   const mimeOf = (path, blob) => {const type = String(blob?.type || '').split(';')[0].trim();return type && type !== 'application/octet-stream' ? type : MIME[String(path).split('.').pop().toLowerCase()] || 'application/octet-stream';};
@@ -36,10 +40,10 @@
         if (DROPPED.has(tag) || (tag === 'x-slot' && el.getAttribute('data-k') !== nonce)) {el.remove();continue;}
         if (!ALLOWED.has(tag) && !ALLOWED.has(tag.toLowerCase())) {clean(el);el.replaceWith(...el.childNodes);continue;}
         for (const at of [...el.attributes]) {
-          const name = at.name.toLowerCase(), value = at.value.trim();
+          const name = at.name.toLowerCase(), value = at.value.trim(), url = urlAsRead(at.value);
           if (/^on/.test(name) || name === 'srcdoc' || name === 'formaction' || name === 'action') el.removeAttribute(at.name);
           else if (name === 'style' && /javascript:|expression\s*\(|url\s*\(|@import/i.test(value)) el.removeAttribute(at.name);
-          else if (URL_ATTRS.has(name) && !(isLocal(value) || /^(https?:|mailto:|#)/i.test(value) || /^data:image\/(png|jpe?g|gif|webp);/i.test(value) || (tag === 'a' && el.hasAttribute('download') && /^data:/i.test(value)))) el.removeAttribute(at.name);
+          else if (URL_ATTRS.has(name) && !(isLocal(url) || /^(https?:|mailto:|#)/i.test(url) || /^data:image\/(png|jpe?g|gif|webp);/i.test(url) || (tag === 'a' && el.hasAttribute('download') && /^data:/i.test(url)))) el.removeAttribute(at.name);
         }
         if (tag === 'input') {if (el.getAttribute('type') !== 'checkbox') {el.remove();continue;}el.setAttribute('disabled', '');}
         clean(el);

@@ -1,5 +1,5 @@
 (function mount(again={}){
-  const version='0.11.33';
+  const version='0.11.34';
   // On chatgpt.com the manifest keeps this script in every tab (resident.js says so): the two
   // buttons beside the input box are always there and open the sidebar. Injected by hand (tests,
   // the live bundle) the sidebar opens at once, and injecting it again shows or hides it.
@@ -382,15 +382,30 @@
   // so a dismissed Chrome prompt costs one click and no second copy.
   let obsidianJob=null;
   try{chrome.runtime.onConnect?.addListener(port=>{const job=obsidianJob;if(!job||port.name!==`obsidian:${job.id}`)return;obsidianJob=null;job.connected(port);});}catch{}
-  function savedNotes(){try{return JSON.parse(localStorage.getItem('chatExportObsidianNotes')||'{}');}catch{return {};}}
-  function savedNote(){return savedNotes()[target().id]||'';}
+  // The links live in chrome.storage.local, which the ChatGPT page cannot read. Links that 0.11.33 and
+  // earlier kept in the page's localStorage move over once and are removed there. Without
+  // chrome.storage (tests, the live bundle) they stay in localStorage.
+  const NOTES='chatExportObsidianNotes',notesArea=(()=>{try{return chrome.storage?.local||null;}catch{return null;}})();
+  let notes={};
+  const pageNotes=()=>{try{return JSON.parse(localStorage.getItem(NOTES)||'{}')||{};}catch{return {};}};
+  (async()=>{const old=pageNotes();if(!notesArea){notes=old;return;}
+    try{const stored=(await notesArea.get(NOTES))?.[NOTES]||{};notes={...old,...stored};
+      if(Object.keys(old).length)await notesArea.set({[NOTES]:notes});
+      try{localStorage.removeItem(NOTES);}catch{}
+      obsidianState();}catch{if(!Object.keys(notes).length)notes=old;}})();
+  try{chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&changes[NOTES]){notes=changes[NOTES].newValue||{};obsidianState();}});}catch{}
+  // Read before writing, so a link saved meanwhile in another ChatGPT tab is kept.
+  async function saveNote(key,url){notes={...notes,[key]:url};
+    if(!notesArea){try{localStorage.setItem(NOTES,JSON.stringify(notes));}catch{}return;}
+    try{await notesArea.set({[NOTES]:{...(await notesArea.get(NOTES))?.[NOTES],[key]:url}});}catch{}}
+  function savedNote(){return notes[target().id]||'';}
   function obsidianState(){const url=savedNote();for(const b of [$('obsOpen'),D('dOpen')]){b.disabled=!url;b.title=url?t('side.obsOpenTip'):t('panel.obsOpenFirst');}}
   function openSaved(){const url=savedNote();if(url.startsWith('obsidian://open?'))location.href=url;return url;}
   // The path is a link: clicking it opens the note in Obsidian, as 打开 does.
   function opened(m,key){const at=document.createElement('a');at.className='chip link';at.textContent=String(m.path).split('/').join(' / ');at.title=t('obs.openNote');
     if(String(m.url).startsWith('obsidian://open?'))at.href=m.url;
     $('status').replaceChildren(t('status.obsSaved'),at,'\n'+t('status.obsOpening'));if(!String(m.url).startsWith('obsidian://open?'))return;
-    if(key)try{localStorage.setItem('chatExportObsidianNotes',JSON.stringify({...savedNotes(),[key]:m.url}));}catch{}
+    if(key)saveNote(key,m.url);
     obsidianState();location.href=m.url;}
   function runObsidian(){const key=target().id;return run('obsidian',async result=>{const sender=globalThis.ChatExportObsidian;
     if(!sender)throw Error(t('err.obsNoModule'));
