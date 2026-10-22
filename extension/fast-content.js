@@ -1,5 +1,5 @@
 (function mount(again={}){
-  const version='0.11.36';
+  const version='0.11.37';
   // On chatgpt.com the manifest keeps this script in every tab (resident.js says so): the two
   // buttons beside the input box are always there and open the sidebar. Injected by hand (tests,
   // the live bundle) the sidebar opens at once, and injecting it again shows or hides it.
@@ -27,7 +27,7 @@
 <div id="list"></div>
 <div class="sbfoot"><div class="stx" id="stx"><div id="status" role="status" aria-live="polite"></div><button id="stop" disabled title="${esc(t('side.stopTip'))}">${icon('stop')}${esc(t('side.stop'))}</button></div><textarea id="output" hidden readonly aria-label="${esc(t('side.previewLabel'))}"></textarea>
 <div class="sbrow"><span id="count">${esc(t('side.count',0,0))}</span><select id="kind" aria-label="${esc(t('side.kind'))}">${kindSelect}</select><span class="opill" id="exportPill"><button id="export">${esc(t('side.export'))}</button><button class="oopen" id="obsOpen" hidden title="${esc(t('side.obsOpenTip'))}" aria-label="${esc(t('side.obsOpen'))}">${icon('ext')}<span>${esc(t('side.obsOpen'))}</span></button></span><button class="ib" id="gear2" title="${esc(t('side.settings'))}">${icon('gear')}</button></div>
-<div class="ftl"><button class="lnk" id="preview">${icon('eye')}<span>${esc(t('side.preview'))}</span></button><span class="fname" id="fname"></span></div></div></div>
+<div class="ftl"><button class="lnk" id="preview">${icon('eye')}<span>${esc(t('side.preview'))}</span></button><span class="fname" id="fname"></span><button class="lnk" id="useFolder" hidden>${esc(t('side.useFolder'))}</button></div></div></div>
 <div class="view setview" id="setView" hidden></div></div>`;
   const $=id=>ui.getElementById(id),route=()=>location.origin+location.pathname,seconds=ms=>(ms/1000).toFixed(2);
   let state=null,busyFlag=false,generation=0,controller,readRoute=null;
@@ -418,6 +418,8 @@
     await send({type:'obsidian:open',job:id});await sent;});}
   $('obsOpen').onclick=openSaved;
   $('reload').onclick=()=>load();
+  // 改用多文件 beside the large-file note: the same setting as HTML 网页的形式 → ZIP.
+  $('useFolder').onclick=()=>settings.set({htmlForm:'folder'});
   // Debug: the unmodified API response, to inspect model_dil_v2 and image fields.
   async function rawExport(){if(busyFlag)return;try{assertCurrent();const url=URL.createObjectURL(new Blob([JSON.stringify(state.raw,null,2)],{type:'application/json'}));try{await send({type:'archive:download',url,filename:filename('raw.json'),saveAs:cfg().saveAs});}finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}$('status').textContent=t('status.rawDone');}catch(e){fail(e.message);}}
   const exportAs=kind=>kind==='pdf'?runPdf():kind==='obsidian'?runObsidian():run(kind);
@@ -432,7 +434,7 @@
   $('list').addEventListener('change',()=>{for(const id of chips)$(id).classList.remove('on');counted();});
   // The count has little room: a short form, and the whole sentence when pointed at.
   function fitPill(){const p=$('exportPill');p.classList.remove('tight');if(!p.classList.contains('two'))return;(window.requestAnimationFrame||setTimeout)(()=>p.classList.toggle('tight',p.scrollWidth>p.clientWidth+1));}
-  function counted(){const n=ids().length,all=boxes().length;$('count').textContent=t('side.count',n,all);$('count').title=t('side.countTip',n,all);}
+  function counted(){const n=ids().length,all=boxes().length;$('count').textContent=t('side.count',n,all);$('count').title=t('side.countTip',n,all);if(state)fileLine();}
   const clock=t=>{const d=new Date(t*1000),now=new Date(),p=n=>String(n).padStart(2,'0'),hm=`${p(d.getHours())}:${p(d.getMinutes())}`;return d.toDateString()===now.toDateString()?hm:`${d.getFullYear()===now.getFullYear()?'':d.getFullYear()+'-'}${p(d.getMonth()+1)}-${p(d.getDate())} ${hm}`;};
   // A message card: role, what it holds, time, and up to four lines of its text.
   function messageRow(m){const v=cfg(),label=document.createElement('label'),box=document.createElement('input'),body=document.createElement('div'),top=document.createElement('div'),text=document.createElement('div'),role=document.createElement('span');
@@ -515,7 +517,17 @@
     for(const b of dui.querySelectorAll('[data-kind]'))b.classList.toggle('on',b.dataset.kind===k);
     dui.querySelector('[data-sub="html"]').textContent=v.htmlForm==='single'?t('dock.html.singleSub'):t('dock.html.zipSub');
     for(const r of ui.querySelectorAll('#list .role'))r.textContent=Settings.role(v,r.classList.contains('a')?'assistant':'user');
-    $('fname').textContent=k==='pdf'?t('side.pdfName'):obs?(state?`${v.obsidianFolder||'Obsidian'} / ${filename('md')}`:''):state?filename(extOf(k)):'';placeDock();}
+    fileLine();placeDock();}
+  // Pictures and files the export would carry: originals, attachments, tables, the code
+  // interpreter's files and the pictures inside cards.
+  function fileCount(messages){return messages.reduce((n,m)=>n+(m.images||[]).length+(m.attachments||[]).length+(m.tables||[]).length
+    +new Set([...String(m.md||'').matchAll(sandboxLink)].map(x=>x[1])).size+(m.dil?uiImageUrls(m).length:0),0);}
+  const chosen=()=>{const pick=new Set(ids());return (state?.messages||[]).filter(m=>pick.has(m.id));};
+  // The line under 导出 shows the file name. When one HTML file would carry many pictures and files,
+  // it says so instead, with 改用多文件 beside it: the same one line, so nothing above it moves.
+  function fileLine(){const v=cfg(),k=v.exportKind,obs=k==='obsidian',n=state?fileCount(chosen()):0,big=k==='html'&&v.htmlForm==='single'&&n>Settings.bigHtmlFiles;
+    $('fname').classList.toggle('warn',big);$('fname').title=big?t('side.htmlBigTip',n):'';$('useFolder').hidden=!big;
+    $('fname').textContent=big?t('side.htmlBig'):k==='pdf'?t('side.pdfName'):obs?(state?`${v.obsidianFolder||'Obsidian'} / ${filename('md')}`:''):state?filename(extOf(k)):'';}
   settings.onChange(syncSettings);
   // Another language: the sidebar and the buttons are drawn again (after an export in progress),
   // and the chat is read again when the sidebar was open.
@@ -534,7 +546,7 @@
   async function quickExport(kind=cfg().exportKind){if(busyFlag)return;await settings.ready;await ensureLoaded();if(!state)return;return exportAs(kind);}
   // The toolbar panel asks for the chat's summary, opens the sidebar and exports through these.
   async function summary(){if(!target().id)return {version,page:'other'};await settings.ready;await ensureLoaded();const ms=state?.messages||[];
-    return {version,page:'chat',ok:!!state,title:state?.title||document.title,messages:ms.length,cards:ms.reduce((n,m)=>n+(m.segments||[]).filter(s=>s.kind==='card').length,0),images:ms.reduce((n,m)=>n+(m.images||[]).length,0),obsidianNote:!!savedNote(),selected:ids().length,status:state?'':$('status').textContent};}
+    return {version,page:'chat',ok:!!state,title:state?.title||document.title,messages:ms.length,cards:ms.reduce((n,m)=>n+(m.segments||[]).filter(s=>s.kind==='card').length,0),images:ms.reduce((n,m)=>n+(m.images||[]).length,0),files:fileCount(chosen()),obsidianNote:!!savedNote(),selected:ids().length,status:state?'':$('status').textContent};}
   try{chrome.runtime.onMessage?.addListener((m,sender,reply)=>{if(!host.isConnected||sender?.id!==chrome.runtime.id)return;
     const respond=p=>{p.then(reply,e=>reply({error:e?.message||String(e)}));return true;};
     if(m?.type==='panel:summary')return respond(summary());

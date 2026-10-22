@@ -41,9 +41,9 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     if (message.type === 'open:shortcuts') return {tab: (await chrome.tabs.create({url: 'chrome://extensions/shortcuts'})).id};
     // The keys Chrome really bound (a page script cannot ask chrome.commands itself).
     if (message.type === 'commands:get') return {commands: (await chrome.commands.getAll()).map(({name, shortcut}) => ({name, shortcut}))};
-    // The explanation page behind the ⓘ of 折叠块等特殊标签 and 图文卡片用 HTML.
+    // The explanation page behind the ⓘ of 折叠块等特殊标签, 图文卡片用 HTML and HTML 网页的形式.
     if (message.type === 'open:help') {
-      if (!['prose-html', 'html-cards'].includes(message.topic)) throw Error(t('bg.noHelp'));
+      if (!['prose-html', 'html-cards', 'html-form'].includes(message.topic)) throw Error(t('bg.noHelp'));
       return {tab: (await chrome.tabs.create({url: chrome.runtime.getURL(`help.html#${message.topic}`)})).id};
     }
     // 保存到 Obsidian: the relay tab (obsidian.html) opens in the background beside this one and pulls

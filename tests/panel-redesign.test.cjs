@@ -22,6 +22,11 @@ test('settings move from the page\'s localStorage to chrome.storage.local once, 
   // New settings start at their defaults (panel-spec section 4).
   for(const [k,v] of Object.entries({saveAs:false,exportKind:'zip',autoClose:false,fileName:'title-date',fileVersion:false,yaml:true,model:true,timestamps:false,sources:false,roleUser:'',roleAssistant:'ChatGPT',dockShow:true,dockPos:'input',uiFolder:false,language:'auto'}))
     assert.equal(store.values[k],v,k);
+  // HTML now defaults to one file; a ZIP chosen before (stored, or in an old page key) stays ZIP.
+  const fresh=Settings.create({area:fakeStorage().area,events:fakeStorage().events});await fresh.ready;assert.equal(fresh.values.htmlForm,'single');
+  const kept=fakeStorage({htmlForm:'folder'}),keptStore=Settings.create({area:kept.area,events:kept.events});await keptStore.ready;assert.equal(keptStore.values.htmlForm,'folder');
+  const oldZip=fakeStorage(),oldZipStore=Settings.create({area:oldZip.area,events:oldZip.events,page:page({chatExportHtmlForm:'folder'})});await oldZipStore.ready;
+  assert.equal(oldZipStore.values.htmlForm,'folder');assert.equal(oldZip.data.htmlForm,'folder');
   // An empty role name is the language's own word.
   assert.equal(Settings.role(store.values,'user'),'我');assert.equal(Settings.role(store.values,'assistant'),'ChatGPT');
 });
@@ -98,10 +103,10 @@ test('settings rows change in place: same elements, focus kept, values and summa
 });
 
 // The page as the manifest's content scripts leave it: buttons beside the input box, the sidebar closed.
-async function residentPage({stored={},url='https://chatgpt.com/c/chat'}={}){
+async function residentPage({stored={},url='https://chatgpt.com/c/chat',conversation=null}={}){
   const dom=new JSDOM('<form><div id="prompt-textarea"></div></form><div data-message-id="b">answer</div>',{url,runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
   const s=fakeStorage(stored),downloads=[];let listener=null;
-  const data={title:'Sample',create_time:1790000000,current_node:'b',mapping:{a:{parent:null,children:['b'],message:{id:'a',create_time:1790000000,author:{role:'user'},content:{parts:['Question']}}},b:{parent:'a',children:[],message:{id:'b',create_time:1790000060,author:{role:'assistant'},metadata:{model_slug:'gpt-6'},content:{parts:['Answer']}}}}};
+  const data=conversation||{title:'Sample',create_time:1790000000,current_node:'b',mapping:{a:{parent:null,children:['b'],message:{id:'a',create_time:1790000000,author:{role:'user'},content:{parts:['Question']}}},b:{parent:'a',children:[],message:{id:'b',create_time:1790000060,author:{role:'assistant'},metadata:{model_slug:'gpt-6'},content:{parts:['Answer']}}}}};
   w.fetch=async path=>({ok:true,json:async()=>path==='/api/auth/session'?{accessToken:'t'}:data});
   w.chrome={storage:{local:s.area,onChanged:s.events},runtime:{id:'ext',getManifest:()=>({version:Settings.version}),getURL:p=>'chrome-extension://ext/'+p,
     sendMessage:async m=>{downloads.push(m);return {id:1};},onMessage:{addListener:l=>{listener=l;}}}};
@@ -136,10 +141,54 @@ test('on chatgpt.com the buttons are there, the sidebar opens from them, and not
   await p.ask({type:'panel:open'});const other=Settings.create({area:p.s.area,events:p.s.events});await other.ready;await other.set({dockShow:false});
   assert.ok(dock.hidden);p.close();
 });
+test('with HTML as one file and more than 10 pictures and files, the file-name line says it may be large and offers ZIP in one click',async()=>{
+  // A chat whose answer holds n generated pictures.
+  const chat=n=>({title:'Posters',create_time:1790000000,current_node:'b',mapping:{a:{parent:null,children:['b'],message:{id:'a',create_time:1790000000,author:{role:'user'},content:{parts:['Make posters']}}},
+    b:{parent:'a',children:[],message:{id:'b',create_time:1790000000,author:{role:'assistant'},content:{content_type:'multimodal_text',parts:['Here:',...Array.from({length:n},(_,i)=>({content_type:'image_asset_pointer',asset_pointer:`file-service://file-${i}`}))]}}}}});
+  const line=async p=>{await p.ask({type:'panel:open'});for(let i=0;i<100&&!p.host.shadowRoot.getElementById('fname').textContent;i++)await new Promise(r=>setTimeout(r,5));
+    const s=p.host.shadowRoot;return {text:s.getElementById('fname').textContent,warn:s.getElementById('fname').classList.contains('warn'),button:!s.getElementById('useFolder').hidden,title:s.getElementById('fname').title};};
+  
+  // 10 is not more than the limit; 11 is.
+  const ten=await residentPage({stored:{exportKind:'html'},conversation:chat(10)});
+  assert.equal((await ten.ask({type:'panel:summary'})).files,10);assert.deepEqual(await line(ten),{text:'Posters - '+Settings.day()+'.html',warn:false,button:false,title:''});ten.close();
+  const p=await residentPage({stored:{exportKind:'html'},conversation:chat(11)}),I18n=p.w.ChatExportI18n,t=k=>I18n.t(k);
+  assert.equal((await p.ask({type:'panel:summary'})).files,11);
+  const before=await line(p);assert.deepEqual({...before,title:undefined},{text:t('side.htmlBig'),warn:true,button:true,title:undefined});assert.equal(before.title,I18n.t('side.htmlBigTip',11));
+  // Only the selected messages count: with the answer unticked there is nothing to carry.
+  const s=p.host.shadowRoot;s.getElementById('mine').click();await new Promise(r=>setTimeout(r,5));assert.equal((await line(p)).warn,false);s.getElementById('all').click();await new Promise(r=>setTimeout(r,5));
+  // 改用多文件 is the same setting as HTML 网页的形式; the line goes back to the file name.
+  s.getElementById('useFolder').click();await new Promise(r=>setTimeout(r,5));
+  assert.equal(p.s.data.htmlForm,'folder');assert.deepEqual(await line(p),{text:'Posters - '+Settings.day()+'.html.zip',warn:false,button:false,title:''});
+  // Other kinds never show it.
+  const zip=await residentPage({stored:{exportKind:'zip'},conversation:chat(11)});assert.equal((await line(zip)).warn,false);zip.close();
+  p.close();
+});
+test('the toolbar panel puts the same note in its info line, before the kind, and switches to ZIP',async()=>{
+  for(const [files,big] of [[11,true],[10,false]]){
+    const dom=new JSDOM('<!doctype html><html><head></head><body data-page="popup"></body></html>',{url:'chrome-extension://x/popup.html',runScripts:'outside-only'}),w=dom.window,stored={language:'zh_CN',exportKind:'html'};
+    w.matchMedia=()=>({matches:false,addEventListener(){}});
+    const listeners=[];
+    w.chrome={runtime:{getManifest:()=>({version:Settings.version,content_scripts:[{js:[]}]}),openOptionsPage(){},reload(){}},
+      storage:{local:{get:async()=>({...stored}),set:async v=>{const c={};for(const [k,x] of Object.entries(v)){c[k]={newValue:x};stored[k]=x;}listeners.forEach(l=>l(c,'local'));},remove:async()=>{}},onChanged:{addListener:l=>listeners.push(l)}},
+      tabs:{query:async()=>[{id:1,url:'https://chatgpt.com/c/x',title:'Posters'}],sendMessage:async(id,m)=>m.type==='panel:summary'?{version:Settings.version,page:'chat',ok:true,title:'Posters',messages:2,cards:0,images:files,files}:{},create(){},update(){},reload(){}},
+      scripting:{executeScript:async()=>{}}};
+    for(const f of ['settings.js','ui-kit.js','panel-page.js'])w.eval(fs.readFileSync(`extension/${f}`,'utf8'));
+    const meta=()=>w.document.getElementById('chatMeta');
+    for(let i=0;i<100&&!/·|⚠/.test(meta()?.textContent||'');i++)await new Promise(r=>setTimeout(r,5));
+    const I18n=w.ChatExportI18n;
+    if(!big){assert.equal(meta().textContent,'2 条消息 · '+I18n.t('count.images',10));assert.equal(w.document.getElementById('useFolder'),null);dom.window.close();continue;}
+    assert.equal(meta().textContent,I18n.t('side.htmlBig'));assert.equal(meta().title,I18n.t('side.htmlBigTip',11));assert.ok(meta().classList.contains('warn'));
+    // 改用多文件 sits between the note and the kind picker, on the same line.
+    const button=w.document.getElementById('useFolder');assert.equal(button.nextElementSibling.id,'kindSel');assert.equal(button.parentElement,meta().parentElement);
+    button.click();for(let i=0;i<100&&w.document.getElementById('useFolder');i++)await new Promise(r=>setTimeout(r,5));
+    assert.equal(stored.htmlForm,'folder');assert.equal(meta().textContent,'2 条消息 · '+I18n.t('count.images',11));
+    dom.window.close();
+  }
+});
 test('the toolbar panel reads the chat\'s summary and exports through the page, closed sidebar or not',async()=>{
   const p=await residentPage({stored:{autoClose:true,fileName:'title'}});
   const summary=await p.ask({type:'panel:summary'});
-  assert.deepEqual({...summary,status:undefined},{version:Settings.version,page:'chat',ok:true,title:'Sample',messages:2,cards:0,images:0,obsidianNote:false,selected:2,status:undefined});
+  assert.deepEqual({...summary,status:undefined},{version:Settings.version,page:'chat',ok:true,title:'Sample',messages:2,cards:0,images:0,files:0,obsidianNote:false,selected:2,status:undefined});
   const r=await p.ask({type:'panel:export',kind:'md'});
   assert.equal(r.error,false,r.status);const sent=p.downloads.find(m=>m.type==='archive:download');assert.equal(sent.filename,'Sample.md');assert.equal(sent.saveAs,false);
   // With the sidebar open, 导出后自动关闭侧边栏 closes it after the export.
@@ -151,13 +200,15 @@ test('the toolbar panel reads the chat\'s summary and exports through the page, 
   const home=await residentPage({url:'https://chatgpt.com/'});
   assert.deepEqual(JSON.parse(JSON.stringify(await home.ask({type:'panel:summary'}))),{version:Settings.version,page:'other'});home.close();
 });
-test('the ⓘ of 折叠块等特殊标签 and 图文卡片用 HTML open their explanation; the others only show a tip',async()=>{
+test('the ⓘ of 折叠块等特殊标签, 图文卡片用 HTML and HTML 网页的形式 open their explanation; the others only show a tip',async()=>{
   const {w}=settingsPage(),store=w.ChatExportSettings.open();await store.ready;const opened=[];
   const box=w.document.getElementById('box');w.ChatExportUI.mountSettings(box,store,{help:topic=>opened.push(topic)});
   box.querySelector('[data-row="proseHtml"] .info').click();
   box.querySelector('[data-row="htmlCards"] .info').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+  box.querySelector('[data-row="htmlForm"] .info').click();
   box.querySelector('[data-row="htmlMap"] .info').click();
-  assert.deepEqual(opened,['prose-html','html-cards']);
+  assert.deepEqual(opened,['prose-html','html-cards','html-form']);
+  assert.equal(box.querySelector('[data-row="htmlForm"] .info').dataset.tip,w.ChatExportI18n.t('tip.htmlForm'));
   assert.equal(box.querySelector('[data-row="proseHtml"] .info').getAttribute('role'),'button');assert.equal(box.querySelector('[data-row="htmlMap"] .info').getAttribute('role'),'img');
   // The page has a section for each, and the background opens only those.
   const help=fs.readFileSync('extension/help.html','utf8'),background=fs.readFileSync('extension/background.js','utf8');

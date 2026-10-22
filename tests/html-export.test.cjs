@@ -161,7 +161,11 @@ test('toHtml without options is unchanged by the live mode; live controls carry 
 test('the panel offers the HTML export, remembers its form and the background accepts .html', () => {
   const kit = require('../extension/ui-kit.js'), settings = require('../extension/settings.js'), background = fs.readFileSync('extension/background.js', 'utf8');
   const rows = kit.groups.flatMap(g => g.rows);
-  assert.deepEqual(rows.find(r => r.key === 'htmlForm').options, [['folder', 'ZIP'], ['single', '单文件']]);
+  // One file is the default and comes first; its ⓘ opens help.html#html-form, which the background allows.
+  const form = rows.find(r => r.key === 'htmlForm');
+  assert.deepEqual(form.options, [['single', '单文件'], ['folder', 'ZIP']]);assert.equal(settings.defaults.htmlForm, 'single');
+  assert.equal(form.tip, 'htmlForm');assert.equal(form.help, 'html-form');assert.match(background, /'html-form'\]\.includes\(message\.topic\)/);
+  assert.match(fs.readFileSync('extension/help.html', 'utf8'), /<section id="html-form">/);
   assert.equal(rows.find(r => r.key === 'htmlMap').tip, 'map');assert.equal(settings.legacy.htmlForm.key, 'chatExportHtmlForm');
   // The words (language files, then i18n.js) load before every script that shows them.
   const scripts = JSON.parse(fs.readFileSync('extension/manifest.json', 'utf8')).content_scripts[0].js;

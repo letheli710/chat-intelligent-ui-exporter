@@ -30,7 +30,7 @@
   const kindIcon={md:'file',zip:'archive',html:'code',pdf:'printer',obsidian:'gem'};
   // The words are looked up when the settings are drawn, in the language picked then.
   const TIPS={};
-  for(const k of ['saveAs','profile','prose','cards','map','fver','yaml','pending','ui','shortcut','obs','ver','language'])Object.defineProperty(TIPS,k,{enumerable:true,get:()=>t(`tip.${k}`)});
+  for(const k of ['saveAs','profile','prose','cards','htmlForm','map','fver','yaml','pending','ui','shortcut','obs','ver','language'])Object.defineProperty(TIPS,k,{enumerable:true,get:()=>t(`tip.${k}`)});
   // An ⓘ with help also opens the explanation page (help.html#<help>) on click or Enter.
   const info=(key,help)=>`<span class="info" tabindex="0" role="${help?'button':'img'}" aria-label="${esc(TIPS[key])}${help?esc(t('set.helpHint')):''}" data-tip="${esc(TIPS[key])}"${help?` data-help="${help}"`:''}>${icon('info')}</span>`;
   const onOff=(on,off)=>(v,ctx,own)=>own?t(on):t(off||'set.off');
@@ -44,7 +44,7 @@
     {key:'def',title:t('set.def'),summary:v=>`${kindLabel(v.exportKind)} · ${profileName(v)}`,rows:[
       {key:'exportKind',label:t('set.exportKind'),value:v=>kindLabel(v.exportKind),control:'select',options:kindOptions()},
       {key:'profile',label:t('set.profile'),tip:'profile',value:profileName,control:'seg',options:[['generic',t('set.profile.genericShort')],['obsidian','Obsidian']]},
-      {key:'htmlForm',label:t('set.htmlForm'),value:v=>v.htmlForm==='single'?t('set.htmlForm.single'):t('set.htmlForm.folder'),control:'seg',options:[['folder','ZIP'],['single',t('set.htmlForm.singleShort')]]},
+      {key:'htmlForm',label:t('set.htmlForm'),tip:'htmlForm',help:'html-form',value:v=>v.htmlForm==='single'?t('set.htmlForm.single'):t('set.htmlForm.folder'),control:'seg',options:[['single',t('set.htmlForm.singleShort')],['folder','ZIP']]},
       {key:'htmlMap',label:t('set.htmlMap'),tip:'map',value:onOff('set.on','set.htmlMap.off'),control:'switch'},
       {key:'autoClose',label:t('set.autoClose'),value:onOff('set.on'),control:'switch'},
       // In each language with "Language" after it, so a page in a language one cannot read still shows where to change it.
@@ -310,6 +310,9 @@
 #exportPill.tight>.oopen span{display:none}
 .ftl{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);min-width:0}
 .ftl .fname{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;font-family:ui-monospace,Consolas,monospace;font-size:11px}
+.ftl .fname,.ftl #useFolder{line-height:18px}
+.ftl .fname.warn{font-family:inherit;font-size:11.5px;color:color-mix(in srgb,var(--warn) 75%,var(--text))}
+.ftl #useFolder{font-size:11.5px;white-space:nowrap;padding:0 2px}
 .lnk{border:0;background:none;color:var(--pri-deep);display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:2px;font-weight:600}
 .lnk .ic{width:14px;height:14px}
 .lnk:disabled{opacity:.45;cursor:default}
