@@ -50,7 +50,7 @@
     raw:async()=>{const target=popup?(chatTab(tab)?tab:null):await lastChatTab();if(!target)return say(t('panel.needChat'),true);
       say(t('panel.rawRunning'));try{const r=await call({type:'panel:raw'},target);say(r?.status||r?.error||'',!!r?.error);}catch(e){say(e.message,true);}},
   };
-  const panel=UI.mountSettings($('settings'),store,{action:name=>actions[name]?.(),help:topic=>chrome.tabs.create({url:chrome.runtime.getURL(`help.html#${topic}`)})},{open:popup?[]:UI.groups.map(g=>g.key)});
+  const panel=UI.mountSettings($('settings'),store,{action:name=>actions[name]?.(),help:topic=>chrome.tabs.create({url:chrome.runtime.getURL(`help.html#${topic}`)}),commands:()=>chrome.commands.getAll()},{open:popup?[]:UI.groups.map(g=>g.key)});
   const shown=I18n.locale;store.onChange((v,changed)=>{if(changed.includes('language')&&I18n.setLocale(v.language)!==shown)location.reload();});
 
   if(!popup)return;

@@ -1,5 +1,5 @@
 (function mount(again={}){
-  const version='0.11.34';
+  const version='0.11.35';
   // On chatgpt.com the manifest keeps this script in every tab (resident.js says so): the two
   // buttons beside the input box are always there and open the sidebar. Injected by hand (tests,
   // the live bundle) the sidebar opens at once, and injecting it again shows or hides it.
@@ -451,7 +451,8 @@
   const panelSettings=UI.mountSettings($('setView'),settings,{
     action:name=>{if(name==='raw')rawExport();else if(name==='obsFolder')send({type:'obsidian:setup'}).catch(e=>fail(e.message));else if(name==='reset')settings.reset();else if(name==='shortcut')send({type:'open:shortcuts'}).catch(e=>fail(e.message));},
     // A page script cannot open extension pages; the background opens the explanation in a new tab.
-    help:topic=>send({type:'open:help',topic}).catch(e=>fail(e.message))});
+    help:topic=>send({type:'open:help',topic}).catch(e=>fail(e.message)),
+    commands:()=>send({type:'commands:get'}).then(r=>r.commands)});
   UI.attachTips(ui,$('sb'));
   // Status lines that end an export with problems are marked; with the sidebar closed they show above the buttons.
   let lastError='',lastWarn='';function fail(message){lastError=message;$('status').textContent=message;}
