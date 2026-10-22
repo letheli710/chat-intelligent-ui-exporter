@@ -111,8 +111,27 @@ test('prose HTML kept as is loses scripts, event attributes and script URLs; SVG
   const {sanitize} = require('../extension/html-export');
   const doc = new JSDOM('').window.document;
   const out = sanitize('<p onclick="x()">a<script>alert(1)</script><a href="javascript:alert(1)">b</a><iframe src="https://e.x"></iframe><svg viewBox="0 0 1 1"><circle r="1" onload="x()"/></svg><x-slot data-k="fake"></x-slot><img src="https://e.x/a.png"></p>', doc, 'real');
-  assert.doesNotMatch(out, /script|onclick|onload|javascript:|iframe|x-slot/);
-  assert.match(out, /<svg viewBox="0 0 1 1"><circle r="1"><\/circle><\/svg>/);assert.match(out, /<a>b<\/a>/);assert.match(out, /<img src="https:\/\/e\.x\/a\.png">/);
+  assert.doesNotMatch(out, /<script|alert|onclick|onload|javascript:|<iframe|x-slot/);
+  assert.match(out, /<svg viewBox="0 0 1 1"><circle r="1"><\/circle><\/svg>/);assert.match(out, /<img src="https:\/\/e\.x\/a\.png">/);
+  // The frame leaves a notice in its place; the link keeps its text, marked, pointing at the explanation.
+  assert.match(out, /<details class="fx-box"><summary>Removed: &lt;iframe&gt; — embedded page<\/summary>/);
+  assert.match(out, /<a class="fx-inline" title="Removed: link address\.[^"]*" href="https:\/\/github\.com\/letheli710\/chat-intelligent-ui-exporter\/blob\/main\/docs\/html-filter\.md#links"[^>]*>b<\/a>/);
+});
+test('removed content that showed on the page leaves an English notice linking to its section; invisible parts go silently', () => {
+  const {sanitize} = require('../extension/html-export');
+  const doc = new JSDOM('').window.document;
+  const notices = {iframe:'embedded-pages', object:'embedded-pages', embed:'embedded-pages', video:'media', audio:'media', canvas:'canvas', form:'forms', button:'forms', select:'forms', textarea:'forms', dialog:'forms'};
+  for (const [tag, key] of Object.entries(notices)) {
+    const out = sanitize(`<p>before</p>${tag === 'embed' ? '<embed src="CONTENT-OF-TAG.swf">' : `<${tag}>CONTENT-OF-TAG</${tag}>`}<p>after</p>`, doc, 'real');
+    assert.match(out, new RegExp(`<summary>Removed: &lt;${tag}&gt; — [^<]+</summary><div class="why">[^<]+<a href="[^"]+#${key}" target="_blank" rel="noopener noreferrer">Learn more →</a>`), tag);
+    assert.match(out, /<p>before<\/p>[\s\S]*<p>after<\/p>/, tag);assert.doesNotMatch(out, /CONTENT-OF-TAG/, tag);
+  }
+  for (const tag of ['script', 'style', 'template', 'noscript']) assert.equal(sanitize(`<p>a</p><${tag}>x</${tag}><p>b</p>`, doc, 'real'), '<p>a</p><p>b</p>', tag);
+  // Inside SVG nothing is added, so the picture keeps its shape.
+  assert.doesNotMatch(sanitize('<svg><title>t</title><a href="javascript:x()"><text>s</text></a></svg>', doc, 'real'), /fx-|Removed/);
+  // Every section a notice links to is a heading in docs/html-filter.md (GitHub makes the anchor from it).
+  const anchors = [...fs.readFileSync('docs/html-filter.md', 'utf8').matchAll(/^## (.+)$/gm)].map(m => m[1].toLowerCase().replace(/[^\w\- ]/g, '').replace(/ /g, '-'));
+  for (const key of [...new Set(Object.values(notices)), 'links']) assert.ok(anchors.includes(key), key);
 });
 test('script URLs hidden by tabs, line breaks or control characters are removed too', () => {
   const {sanitize} = require('../extension/html-export');
@@ -121,7 +140,9 @@ test('script URLs hidden by tabs, line breaks or control characters are removed 
   const hidden = ['java&#9;script:x()', 'java&#10;script:x()', 'java&#13;script:x()', 'java\tscript:x()', ' &#1;javascript:x()', 'jav&#x09;ascript:x()', 'JaVa&#9;ScRiPt:x()', 'vb&#9;script:x()', 'da&#9;ta:text/html,x'];
   for (const href of hidden) {
     const out = sanitize(`<a href="${href}">a</a><svg><a href="${href}"><text>b</text></a><a xlink:href="${href}"><text>c</text></a><use href="${href}"></use></svg>`, doc, 'real');
-    assert.doesNotMatch(out, /href/, href);
+    // Only the explanation link is left, on the HTML link; the SVG ones lose theirs.
+    assert.doesNotMatch(out.replace(/href="https:\/\/github\.com\/letheli710\/chat-intelligent-ui-exporter\/blob\/main\/docs\/html-filter\.md#links"/, ''), /href/, href);
+    assert.match(out, /^<a class="fx-inline"/, href);
   }
   // Ordinary links, local files and inline pictures are kept as they were.
   const kept = sanitize('<a href="https://e.x/a">a</a><a href="files/a.csv">b</a><a href="#n">c</a><img src="data:image/png;base64,AA=="><svg><a href="https://e.x/b"><text>d</text></a></svg>', doc, 'real');

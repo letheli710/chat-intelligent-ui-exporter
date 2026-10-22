@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extName__",
-  "version": "0.11.35",
-  "version_name": "0.11.35",
+  "version": "0.11.36",
+  "version_name": "0.11.36",
   "description": "__MSG_extDescription__",
   "default_locale": "en",
   "permissions": [
