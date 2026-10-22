@@ -1,5 +1,5 @@
 (function mount(again={}){
-  const version='0.11.37';
+  const version='0.11.38';
   // On chatgpt.com the manifest keeps this script in every tab (resident.js says so): the two
   // buttons beside the input box are always there and open the sidebar. Injected by hand (tests,
   // the live bundle) the sidebar opens at once, and injecting it again shows or hides it.
@@ -27,7 +27,7 @@
 <div id="list"></div>
 <div class="sbfoot"><div class="stx" id="stx"><div id="status" role="status" aria-live="polite"></div><button id="stop" disabled title="${esc(t('side.stopTip'))}">${icon('stop')}${esc(t('side.stop'))}</button></div><textarea id="output" hidden readonly aria-label="${esc(t('side.previewLabel'))}"></textarea>
 <div class="sbrow"><span id="count">${esc(t('side.count',0,0))}</span><select id="kind" aria-label="${esc(t('side.kind'))}">${kindSelect}</select><span class="opill" id="exportPill"><button id="export">${esc(t('side.export'))}</button><button class="oopen" id="obsOpen" hidden title="${esc(t('side.obsOpenTip'))}" aria-label="${esc(t('side.obsOpen'))}">${icon('ext')}<span>${esc(t('side.obsOpen'))}</span></button></span><button class="ib" id="gear2" title="${esc(t('side.settings'))}">${icon('gear')}</button></div>
-<div class="ftl"><button class="lnk" id="preview">${icon('eye')}<span>${esc(t('side.preview'))}</span></button><span class="fname" id="fname"></span><button class="lnk" id="useFolder" hidden>${esc(t('side.useFolder'))}</button></div></div></div>
+<div class="ftl"><button class="lnk" id="preview">${icon('eye')}<span>${esc(t('side.preview'))}</span></button><span class="fname" id="fname"></span><button class="lnk" id="useFolder" hidden>${esc(t('side.htmlBig'))}</button></div></div></div>
 <div class="view setview" id="setView" hidden></div></div>`;
   const $=id=>ui.getElementById(id),route=()=>location.origin+location.pathname,seconds=ms=>(ms/1000).toFixed(2);
   let state=null,busyFlag=false,generation=0,controller,readRoute=null;
@@ -524,10 +524,11 @@
     +new Set([...String(m.md||'').matchAll(sandboxLink)].map(x=>x[1])).size+(m.dil?uiImageUrls(m).length:0),0);}
   const chosen=()=>{const pick=new Set(ids());return (state?.messages||[]).filter(m=>pick.has(m.id));};
   // The line under 导出 shows the file name. When one HTML file would carry many pictures and files,
-  // it says so instead, with 改用多文件 beside it: the same one line, so nothing above it moves.
+  // it shows instead the suggestion to use ZIP, which switches when clicked: the same one line, so
+  // nothing above it moves.
   function fileLine(){const v=cfg(),k=v.exportKind,obs=k==='obsidian',n=state?fileCount(chosen()):0,big=k==='html'&&v.htmlForm==='single'&&n>Settings.bigHtmlFiles;
-    $('fname').classList.toggle('warn',big);$('fname').title=big?t('side.htmlBigTip',n):'';$('useFolder').hidden=!big;
-    $('fname').textContent=big?t('side.htmlBig'):k==='pdf'?t('side.pdfName'):obs?(state?`${v.obsidianFolder||'Obsidian'} / ${filename('md')}`:''):state?filename(extOf(k)):'';}
+    $('useFolder').hidden=!big;$('useFolder').title=big?t('side.htmlBigTip',n):'';
+    $('fname').textContent=big?'':k==='pdf'?t('side.pdfName'):obs?(state?`${v.obsidianFolder||'Obsidian'} / ${filename('md')}`:''):state?filename(extOf(k)):'';}
   settings.onChange(syncSettings);
   // Another language: the sidebar and the buttons are drawn again (after an export in progress),
   // and the chat is read again when the sidebar was open.

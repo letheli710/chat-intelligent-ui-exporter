@@ -311,8 +311,8 @@
 .ftl{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);min-width:0}
 .ftl .fname{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;font-family:ui-monospace,Consolas,monospace;font-size:11px}
 .ftl .fname,.ftl #useFolder{line-height:18px}
-.ftl .fname.warn{font-family:inherit;font-size:11.5px;color:color-mix(in srgb,var(--warn) 75%,var(--text))}
-.ftl #useFolder{font-size:11.5px;white-space:nowrap;padding:0 2px}
+.ftl #useFolder{font-size:11.5px;white-space:nowrap;padding:0 2px;color:color-mix(in srgb,var(--warn) 75%,var(--text));text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.ftl #useFolder:hover{color:var(--text)}
 .lnk{border:0;background:none;color:var(--pri-deep);display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:2px;font-weight:600}
 .lnk .ic{width:14px;height:14px}
 .lnk:disabled{opacity:.45;cursor:default}

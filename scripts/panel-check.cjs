@@ -256,9 +256,9 @@ form{position:fixed;bottom:28px;left:calc(260px + (100vw - 260px - 768px) / 2);w
     await (await inShadow('fast-text-dock', '#dSelect')).click();
     await page.waitForFunction(() => document.querySelector('[data-archive-owned="fast-text"]').shadowRoot.querySelectorAll('#list input').length > 0, {timeout:20000});await sleep(300);
     const sideLine = () => page.evaluate(() => {const s = document.querySelector('[data-archive-owned="fast-text"]').shadowRoot, top = id => Math.round(s.getElementById(id).getBoundingClientRect().top);
-      return {text:s.getElementById('fname').textContent, button:!s.getElementById('useFolder').hidden, rows:[top('stx'), top('export'), top('fname')]};});
+      return {text:s.getElementById('useFolder').hidden ? s.getElementById('fname').textContent : s.getElementById('useFolder').textContent, button:!s.getElementById('useFolder').hidden, rows:[top('stx'), top('export'), top('preview')]};});
     const bigSide = await sideLine();
-    check(bigSide.text === '⚠ 文件可能很大' && bigSide.button, `the sidebar's file-name line says one HTML file may be large (${bigSide.text})`);
+    check(bigSide.text === '⚠ 文件较大，建议改用多文件 →' && bigSide.button, `the sidebar's file-name line becomes the clickable suggestion to use ZIP (${bigSide.text})`);
     await page.screenshot({path:path.join(out, '19-sidebar-big-html.png')});
     await (await inShadow('fast-text', '#useFolder')).click();await sleep(300);
     const zipSide = await sideLine();
@@ -270,7 +270,7 @@ form{position:fixed;bottom:28px;left:calc(260px + (100vw - 260px - 768px) / 2);w
     await bigPopup.waitForFunction(() => /⚠/.test(document.getElementById('chatMeta')?.textContent || ''), {timeout:20000}).catch(() => {});
     const popupLine = () => bigPopup.evaluate(() => ({text:document.getElementById('chatMeta').textContent, button:!!document.getElementById('useFolder'), rows:['kindSel', 'export', 'pick'].map(id => Math.round(document.getElementById(id).getBoundingClientRect().top))}));
     const bigTop = await popupLine();
-    check(bigTop.text === '⚠ 文件可能很大' && bigTop.button, `the toolbar panel's info line says one HTML file may be large (${bigTop.text})`);
+    check(bigTop.text === '⚠ 文件较大，建议改用多文件 →' && bigTop.button, `the toolbar panel's info line becomes the clickable suggestion to use ZIP (${bigTop.text})`);
     await bigPopup.screenshot({path:path.join(out, '20-popup-big-html.png'), fullPage:true});
     await bigPopup.click('#useFolder');await sleep(300);
     const zipTop = await popupLine();

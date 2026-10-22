@@ -141,29 +141,30 @@ test('on chatgpt.com the buttons are there, the sidebar opens from them, and not
   await p.ask({type:'panel:open'});const other=Settings.create({area:p.s.area,events:p.s.events});await other.ready;await other.set({dockShow:false});
   assert.ok(dock.hidden);p.close();
 });
-test('with HTML as one file and more than 10 pictures and files, the file-name line says it may be large and offers ZIP in one click',async()=>{
+test('with HTML as one file and more than 10 pictures and files, the file-name line becomes a clickable suggestion to use ZIP',async()=>{
   // A chat whose answer holds n generated pictures.
   const chat=n=>({title:'Posters',create_time:1790000000,current_node:'b',mapping:{a:{parent:null,children:['b'],message:{id:'a',create_time:1790000000,author:{role:'user'},content:{parts:['Make posters']}}},
     b:{parent:'a',children:[],message:{id:'b',create_time:1790000000,author:{role:'assistant'},content:{content_type:'multimodal_text',parts:['Here:',...Array.from({length:n},(_,i)=>({content_type:'image_asset_pointer',asset_pointer:`file-service://file-${i}`}))]}}}}});
   const line=async p=>{await p.ask({type:'panel:open'});for(let i=0;i<100&&!p.host.shadowRoot.getElementById('fname').textContent;i++)await new Promise(r=>setTimeout(r,5));
-    const s=p.host.shadowRoot;return {text:s.getElementById('fname').textContent,warn:s.getElementById('fname').classList.contains('warn'),button:!s.getElementById('useFolder').hidden,title:s.getElementById('fname').title};};
+    const s=p.host.shadowRoot;const b=s.getElementById('useFolder');return {text:s.getElementById('fname').textContent,suggestion:b.hidden?'':b.textContent,title:b.hidden?'':b.title};};
   
   // 10 is not more than the limit; 11 is.
   const ten=await residentPage({stored:{exportKind:'html'},conversation:chat(10)});
-  assert.equal((await ten.ask({type:'panel:summary'})).files,10);assert.deepEqual(await line(ten),{text:'Posters - '+Settings.day()+'.html',warn:false,button:false,title:''});ten.close();
+  assert.equal((await ten.ask({type:'panel:summary'})).files,10);assert.deepEqual(await line(ten),{text:'Posters - '+Settings.day()+'.html',suggestion:'',title:''});ten.close();
   const p=await residentPage({stored:{exportKind:'html'},conversation:chat(11)}),I18n=p.w.ChatExportI18n,t=k=>I18n.t(k);
   assert.equal((await p.ask({type:'panel:summary'})).files,11);
-  const before=await line(p);assert.deepEqual({...before,title:undefined},{text:t('side.htmlBig'),warn:true,button:true,title:undefined});assert.equal(before.title,I18n.t('side.htmlBigTip',11));
+  // The file name gives way to one clickable suggestion; the count and what a click does are on hover.
+  assert.deepEqual(await line(p),{text:'',suggestion:t('side.htmlBig'),title:I18n.t('side.htmlBigTip',11)});assert.match(t('side.htmlBig'),/建议改用多文件/);
   // Only the selected messages count: with the answer unticked there is nothing to carry.
-  const s=p.host.shadowRoot;s.getElementById('mine').click();await new Promise(r=>setTimeout(r,5));assert.equal((await line(p)).warn,false);s.getElementById('all').click();await new Promise(r=>setTimeout(r,5));
+  const s=p.host.shadowRoot;s.getElementById('mine').click();await new Promise(r=>setTimeout(r,5));assert.equal((await line(p)).suggestion,'');s.getElementById('all').click();await new Promise(r=>setTimeout(r,5));
   // 改用多文件 is the same setting as HTML 网页的形式; the line goes back to the file name.
   s.getElementById('useFolder').click();await new Promise(r=>setTimeout(r,5));
-  assert.equal(p.s.data.htmlForm,'folder');assert.deepEqual(await line(p),{text:'Posters - '+Settings.day()+'.html.zip',warn:false,button:false,title:''});
+  assert.equal(p.s.data.htmlForm,'folder');assert.deepEqual(await line(p),{text:'Posters - '+Settings.day()+'.html.zip',suggestion:'',title:''});
   // Other kinds never show it.
-  const zip=await residentPage({stored:{exportKind:'zip'},conversation:chat(11)});assert.equal((await line(zip)).warn,false);zip.close();
+  const zip=await residentPage({stored:{exportKind:'zip'},conversation:chat(11)});assert.equal((await line(zip)).suggestion,'');zip.close();
   p.close();
 });
-test('the toolbar panel puts the same note in its info line, before the kind, and switches to ZIP',async()=>{
+test('the toolbar panel\'s info line becomes the same clickable suggestion, before the kind, and switches to ZIP',async()=>{
   for(const [files,big] of [[11,true],[10,false]]){
     const dom=new JSDOM('<!doctype html><html><head></head><body data-page="popup"></body></html>',{url:'chrome-extension://x/popup.html',runScripts:'outside-only'}),w=dom.window,stored={language:'zh_CN',exportKind:'html'};
     w.matchMedia=()=>({matches:false,addEventListener(){}});
@@ -177,9 +178,11 @@ test('the toolbar panel puts the same note in its info line, before the kind, an
     for(let i=0;i<100&&!/·|⚠/.test(meta()?.textContent||'');i++)await new Promise(r=>setTimeout(r,5));
     const I18n=w.ChatExportI18n;
     if(!big){assert.equal(meta().textContent,'2 条消息 · '+I18n.t('count.images',10));assert.equal(w.document.getElementById('useFolder'),null);dom.window.close();continue;}
-    assert.equal(meta().textContent,I18n.t('side.htmlBig'));assert.equal(meta().title,I18n.t('side.htmlBigTip',11));assert.ok(meta().classList.contains('warn'));
+    // The info line is the suggestion itself, a button that switches to ZIP.
+    const button=w.document.getElementById('useFolder');
+    assert.equal(meta().textContent,I18n.t('side.htmlBig'));assert.equal(button.parentElement,meta());assert.equal(button.title,I18n.t('side.htmlBigTip',11));
     // 改用多文件 sits between the note and the kind picker, on the same line.
-    const button=w.document.getElementById('useFolder');assert.equal(button.nextElementSibling.id,'kindSel');assert.equal(button.parentElement,meta().parentElement);
+    assert.equal(meta().nextElementSibling.id,'kindSel');
     button.click();for(let i=0;i<100&&w.document.getElementById('useFolder');i++)await new Promise(r=>setTimeout(r,5));
     assert.equal(stored.htmlForm,'folder');assert.equal(meta().textContent,'2 条消息 · '+I18n.t('count.images',11));
     dom.window.close();
