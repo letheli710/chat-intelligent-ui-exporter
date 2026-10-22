@@ -31,6 +31,9 @@ form{position:fixed;bottom:28px;left:calc(260px + (100vw - 260px - 768px) / 2);w
 (async () => {
   if (!executablePath) throw Error('Chrome not found; set CHROME_PATH');
   const raw = JSON.parse(fs.readFileSync(rawPath, 'utf8')), id = raw.conversation_id || 'demo-chat', title = raw.title || 'ChatGPT';
+  // A second chat with 11 generated pictures, for the note that one HTML file may be large.
+  const manyId = 'many-pictures', many = {title:'海报', conversation_id:manyId, current_node:'b', mapping:{a:{parent:null, children:['b'], message:{id:'a', create_time:1790000000, author:{role:'user'}, content:{parts:['做海报']}}},
+    b:{parent:'a', children:[], message:{id:'b', create_time:1790000000, author:{role:'assistant'}, content:{content_type:'multimodal_text', parts:['给你：', ...Array.from({length:11}, (_, i) => ({content_type:'image_asset_pointer', asset_pointer:`file-service://file-${i}`}))]}}}}};
   fs.rmSync(out, {recursive:true, force:true});fs.mkdirSync(path.join(out, 'downloads'), {recursive:true});
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'panel-check-')), downloads = path.join(out, 'downloads');
   // The profile's own download folder, so the files keep the names the extension gives them.
@@ -52,6 +55,7 @@ form{position:fixed;bottom:28px;left:calc(260px + (100vw - 260px - 768px) / 2);w
       if (u.host !== 'chatgpt.com' && u.host !== 'files.example') return r.continue();
       const json = body => r.respond({status:200, contentType:'application/json', body:JSON.stringify(body)});
       if (u.pathname === '/api/auth/session') return json({accessToken:'t'});
+      if (u.pathname.startsWith(`/backend-api/conversation/${manyId}`)) return json(many);
       if (u.pathname.startsWith('/backend-api/conversation/') && !u.pathname.includes('/interpreter/')) return json(raw);
       if (/^\/backend-api\/(files|conversation)\//.test(u.pathname)) return json({status:'success', download_url:'https://files.example/f.png'});
       if (u.host === 'files.example' || u.pathname.startsWith('/backend-api/')) return r.respond({status:200, contentType:'image/png', body:PNG});
@@ -132,6 +136,12 @@ form{position:fixed;bottom:28px;left:calc(260px + (100vw - 260px - 768px) / 2);w
     await help.setViewport({width:1000, height:900});await sleep(400);
     check(await help.evaluate(() => !!document.querySelector('section#html-cards') && document.body.classList.contains('cx')), 'clicking ⓘ opens the explanation page at its section');
     await help.screenshot({path:path.join(out, '7b-help.png'), fullPage:true});await help.close();
+    // So does the ⓘ of HTML 网页的形式, at its own section.
+    await options.click('[data-row="htmlForm"] .info');
+    const formHelp = await (await browser.waitForTarget(t => t.url() === base + 'help.html#html-form', {timeout:10000})).asPage();
+    await formHelp.setViewport({width:1000, height:900});await sleep(400);
+    check(await formHelp.evaluate(() => {const s = document.querySelector('section#html-form');return !!s && s.querySelectorAll('.opt').length === 2 && !/\b(help|set)\.[a-z]/.test(s.textContent);}), 'the ⓘ of HTML 网页的形式 opens help.html#html-form, with both forms explained');
+    await formHelp.screenshot({path:path.join(out, '7c-help-html-form.png'), fullPage:true});await formHelp.close();
     await options.close();
     // The toolbar panel, opened over the chat tab.
     await page.bringToFront();
@@ -239,6 +249,33 @@ form{position:fixed;bottom:28px;left:calc(260px + (100vw - 260px - 768px) / 2);w
     check(await other.evaluate(() => document.querySelector('#hero .xt').textContent === '这里没有 ChatGPT 对话' && !!document.getElementById('openChat')), 'the toolbar panel says when the tab is not a ChatGPT chat');
     await other.screenshot({path:path.join(out, '9b-popup-not-chat.png')});
     await other.close().catch(() => {});await blank.close();await page.bringToFront();
+    // A chat with 11 pictures, HTML as one file: the file-name line of the sidebar and the info line of
+    // the toolbar panel say it may be large, with 改用多文件; the rows around them do not move.
+    await sw.evaluate(() => chrome.storage.local.set({exportKind:'html', htmlForm:'single'}));
+    await page.goto(`https://chatgpt.com/c/${manyId}`);await page.waitForSelector('[data-archive-owned="fast-text-dock"]');await sleep(1200);
+    await (await inShadow('fast-text-dock', '#dSelect')).click();
+    await page.waitForFunction(() => document.querySelector('[data-archive-owned="fast-text"]').shadowRoot.querySelectorAll('#list input').length > 0, {timeout:20000});await sleep(300);
+    const sideLine = () => page.evaluate(() => {const s = document.querySelector('[data-archive-owned="fast-text"]').shadowRoot, top = id => Math.round(s.getElementById(id).getBoundingClientRect().top);
+      return {text:s.getElementById('useFolder').hidden ? s.getElementById('fname').textContent : s.getElementById('useFolder').textContent, button:!s.getElementById('useFolder').hidden, rows:[top('stx'), top('export'), top('preview')]};});
+    const bigSide = await sideLine();
+    check(bigSide.text === '⚠ 文件较大，建议改用多文件 →' && bigSide.button, `the sidebar's file-name line becomes the clickable suggestion to use ZIP (${bigSide.text})`);
+    await page.screenshot({path:path.join(out, '19-sidebar-big-html.png')});
+    await (await inShadow('fast-text', '#useFolder')).click();await sleep(300);
+    const zipSide = await sideLine();
+    check(zipSide.text.endsWith('.html.zip') && !zipSide.button && JSON.stringify(zipSide.rows) === JSON.stringify(bigSide.rows), `改用多文件 switches to ZIP and nothing in the sidebar moves (${bigSide.rows} → ${zipSide.rows})`);
+    check((await sw.evaluate(() => chrome.storage.local.get('htmlForm'))).htmlForm === 'folder', '改用多文件 is the same setting as HTML 网页的形式');
+    await sw.evaluate(() => chrome.storage.local.set({htmlForm:'single'}));
+    await sw.evaluate(() => chrome.action.openPopup());
+    const bigPopup = await (await browser.waitForTarget(t => t.url() === base + 'popup.html', {timeout:10000})).asPage();
+    await bigPopup.waitForFunction(() => /⚠/.test(document.getElementById('chatMeta')?.textContent || ''), {timeout:20000}).catch(() => {});
+    const popupLine = () => bigPopup.evaluate(() => ({text:document.getElementById('chatMeta').textContent, button:!!document.getElementById('useFolder'), rows:['kindSel', 'export', 'pick'].map(id => Math.round(document.getElementById(id).getBoundingClientRect().top))}));
+    const bigTop = await popupLine();
+    check(bigTop.text === '⚠ 文件较大，建议改用多文件 →' && bigTop.button, `the toolbar panel's info line becomes the clickable suggestion to use ZIP (${bigTop.text})`);
+    await bigPopup.screenshot({path:path.join(out, '20-popup-big-html.png'), fullPage:true});
+    await bigPopup.click('#useFolder');await sleep(300);
+    const zipTop = await popupLine();
+    check(/条消息/.test(zipTop.text) && !zipTop.button && JSON.stringify(zipTop.rows) === JSON.stringify(bigTop.rows), `改用多文件 in the toolbar panel switches to ZIP and its buttons do not move (${bigTop.rows} → ${zipTop.rows})`);
+    await bigPopup.close().catch(() => {});await page.goto(`https://chatgpt.com/c/${id}`);await page.waitForSelector('[data-archive-owned="fast-text-dock"]');await sleep(800);
     // Dark ChatGPT page.
     dark = true;await page.goto(`https://chatgpt.com/c/${id}`);await page.waitForSelector('[data-archive-owned="fast-text-dock"]');await sleep(1200);
     await (await inShadow('fast-text-dock', '#dSelect')).click();

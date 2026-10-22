@@ -18,6 +18,9 @@ code{font:12.5px ui-monospace,Consolas,monospace;background:var(--bg);border-rad
 .opt{border-radius:16px;background:var(--bg);padding:14px 16px}
 .opt b{display:block;font-size:14px;margin-bottom:4px}
 .opt p{font-size:13px;line-height:1.65;color:color-mix(in srgb,var(--text) 85%,var(--bg))}
+.pts{margin:8px 0 0;padding:0;list-style:none;font-size:13px;line-height:1.65;color:color-mix(in srgb,var(--text) 85%,var(--bg))}
+.pts li+li{margin-top:4px}
+.pts b{display:inline;font-size:13px;margin:0 2px 0 0;color:var(--text)}
 .see{margin-top:12px;background:var(--surface);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.6;overflow-wrap:anywhere}
 .see.quote{background:var(--bg);margin-top:10px}
 .see.mono{font:12px/1.6 ui-monospace,Consolas,monospace;color:var(--muted)}
@@ -63,6 +66,20 @@ table.t td{border:1px solid var(--line);padding:5px 7px;vertical-align:middle}
 </div>
 <p class="note" data-i18n="help.cards.note"></p>
 <div class="pick"><b data-i18n="help.how"></b><span data-i18n="help.cards.pick"></span></div>
+</section>
+
+<section id="html-form">
+<h2 data-i18n="help.form.title"></h2>
+<p data-i18n="help.form.intro"></p>
+<div class="cmp">
+<div class="opt"><b data-i18n="help.form.singleTitle"></b><p data-i18n="help.form.single"></p>
+<ul class="pts"><li><b data-i18n="help.form.prosLabel"></b><span data-i18n="help.form.singlePros"></span></li><li><b data-i18n="help.form.noteLabel"></b><span data-i18n="help.form.singleNote"></span></li><li><b data-i18n="help.form.forLabel"></b><span data-i18n="help.form.singleFor"></span></li></ul>
+<div class="see mono"><span data-i18n="set.exampleTitle"></span> - 2026-10-22.html</div></div>
+<div class="opt"><b data-i18n="help.form.folderTitle"></b><p data-i18n="help.form.folder"></p>
+<ul class="pts"><li><b data-i18n="help.form.prosLabel"></b><span data-i18n="help.form.folderPros"></span></li><li><b data-i18n="help.form.noteLabel"></b><span data-i18n-html="help.form.folderNote"></span></li><li><b data-i18n="help.form.forLabel"></b><span data-i18n="help.form.folderFor"></span></li></ul>
+<div class="see mono"><span data-i18n="set.exampleTitle"></span> - 2026-10-22.html.zip<br>├ conversation.html<br>├ assets/<br>└ files/</div></div>
+</div>
+<div class="pick"><b data-i18n="help.how"></b><span data-i18n="help.form.pick"></span></div>
 </section>
 <p class="foot" data-i18n="help.foot"></p>
 </main>

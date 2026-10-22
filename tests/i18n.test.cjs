@@ -84,7 +84,7 @@ test('the code and the language files name the same texts', () => {
   // Keys built from a name: kind.<k>.<part>, tip.<name>, dock.preset.<p>, …
   for (const k of ['md', 'zip', 'html', 'pdf', 'obsidian']) for (const p of ['name', 'verb', 'short', 'option', 'menu', 'side']) used.add(`kind.${k}.${p}`);
   for (const k of ['title', 'title-date', 'date-title', 'prefix']) used.add(`fileName.${k}`);
-  for (const k of ['saveAs', 'profile', 'prose', 'cards', 'map', 'fver', 'yaml', 'pending', 'ui', 'shortcut', 'obs', 'ver', 'language']) used.add(`tip.${k}`);
+  for (const k of ['saveAs', 'profile', 'prose', 'cards', 'htmlForm', 'map', 'fver', 'yaml', 'pending', 'ui', 'shortcut', 'obs', 'ver', 'language']) used.add(`tip.${k}`);
   for (const k of ['all', 'mine', 'answers', 'none']) used.add(`dock.preset.${k}`);
   for (const k of ['aboveNoHtml', 'belowNoHtml']) used.add(`card.${k}`);
   for (const k of ['noTextAbove', 'noTextBelow', 'mismatchAbove', 'mismatchBelow']) used.add(`dil.v.${k}`);

@@ -61,14 +61,19 @@
       hero.innerHTML=`<div class="xk">${esc(t('panel.thisTab'))}</div><div class="xt">${esc(t('panel.notChat'))}</div><div class="xm">${esc(t('panel.notChatHint'))}</div><div class="xbtns"><button class="xb ghost" id="openChat" type="button">${icon('ext')}${esc(t('panel.openChatGPT'))}</button></div>`;
       $('openChat').onclick=()=>{if(chatTab(tab))chrome.tabs.update(tab.id,{url:'https://chatgpt.com/'});else chrome.tabs.create({url:'https://chatgpt.com/'});window.close();};return;}
     const k=store.values.exportKind,meta=!summary?t('panel.reading'):summary.ok?[t('count.messages',summary.messages),summary.cards&&t('count.cards',summary.cards),summary.images&&t('count.images',summary.images)].filter(Boolean).join(' · '):summary.status;
+    // When one HTML file would carry many pictures and files, that line is instead the suggestion to
+    // use ZIP, which switches when clicked: still one line, so the buttons below do not move.
+    const big=!!summary?.ok&&k==='html'&&store.values.htmlForm==='single'&&summary.files>S.bigHtmlFiles;
     // The chat's title, then what it holds and, at the end of that line, the export kind (the same
     // default as 导出 ▾ beside the input box and 默认导出 in the settings).
-    hero.innerHTML=`<div class="xt" id="chatTitle"></div><div class="xm row"><span class="${summary&&!summary.ok?'bad':''}" id="chatMeta"></span><select class="ksel" id="kindSel" aria-label="${esc(t('panel.kindLabel'))}" title="${esc(t('panel.kindTip'))}">${UI.kindOptions.map(([v])=>`<option value="${v}">${esc(S.kinds[v].name)}</option>`).join('')}</select></div><div class="xbtns">${k==='obsidian'
+    hero.innerHTML=`<div class="xt" id="chatTitle"></div><div class="xm row"><span class="${summary&&!summary.ok?'bad':''}" id="chatMeta">${big?`<button class="warnlink" id="useFolder" type="button"></button>`:''}</span><select class="ksel" id="kindSel" aria-label="${esc(t('panel.kindLabel'))}" title="${esc(t('panel.kindTip'))}">${UI.kindOptions.map(([v])=>`<option value="${v}">${esc(S.kinds[v].name)}</option>`).join('')}</select></div><div class="xbtns">${k==='obsidian'
       // Obsidian: the pill 保存到 Obsidian | 打开 (打开: the note last saved from this chat).
       ?`<span class="opill two"><button class="xb pri" id="export" type="button">${icon('gem')}${esc(S.kinds[k].verb)}</button><button class="oopen" id="obsOpen" type="button" ${summary?.obsidianNote?'':'disabled'} title="${esc(summary?.obsidianNote?t('side.obsOpenTip'):t('panel.obsOpenFirst'))}">${icon('ext')}${esc(t('side.obsOpen'))}</button></span>`
       :`<button class="xb pri" id="export" type="button">${icon(UI.kindIcon[k])}${esc(S.kinds[k].verb)}</button>`}<button class="xb ghost" id="pick" type="button">${esc(t('panel.pick'))}</button></div>`;
     $('obsOpen')?.addEventListener('click',async()=>{try{await call({type:'panel:obsidianOpen'});window.close();}catch(e){say(e.message,true);}});
-    $('chatTitle').textContent=summary?.title||tab.title||'ChatGPT';$('chatMeta').textContent=meta;
+    $('chatTitle').textContent=summary?.title||tab.title||'ChatGPT';
+    if(big){const b=$('useFolder');b.textContent=t('side.htmlBig');b.title=t('side.htmlBigTip',summary.files);b.onclick=()=>store.set({htmlForm:'folder'});}
+    else $('chatMeta').textContent=meta;
     $('kindSel').value=k;$('kindSel').onchange=()=>store.set({exportKind:$('kindSel').value});
     $('export').disabled=!summary;
     $('export').onclick=async()=>{const kind=store.values.exportKind;$('export').disabled=true;
@@ -76,7 +81,7 @@
       try{const r=await call({type:'panel:export',kind});if(kind!=='pdf'||r?.error)say(r?.status||'',!!r?.error);}catch(e){say(e.message,true);}finally{if($('export'))$('export').disabled=false;}};
     $('pick').onclick=async()=>{try{await call({type:'panel:open'});window.close();}catch(e){say(e.message,true);}};
   }
-  store.onChange((v,changed)=>{if(changed.includes('exportKind'))drawHero();});
+  store.onChange((v,changed)=>{if(changed.includes('exportKind')||changed.includes('htmlForm'))drawHero();});
   drawHero();
   if(chatTab(tab))try{
     summary=await call({type:'panel:summary'});
@@ -99,6 +104,8 @@ body[data-page=popup]{width:360px}
 .xm.bad,.xm .bad{color:color-mix(in srgb,var(--err) 70%,var(--text))}
 .xm.row{display:flex;align-items:center;gap:8px}
 .xm.row>span{flex:1;min-width:0}
+.cx .warnlink{display:block;max-width:100%;border:0;background:none;padding:0;font:inherit;font-weight:600;color:color-mix(in srgb,var(--warn) 75%,var(--text));text-decoration:underline;text-underline-offset:3px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.cx .warnlink:hover{color:var(--text)}
 .ksel{flex:none;font:inherit;font-size:12px;font-weight:500;color:var(--pri-deep);background:color-mix(in srgb,var(--pri) 12%,var(--surface));border:0;border-radius:999px;padding:4px 8px;cursor:pointer}
 .ksel option{background:var(--surface);color:var(--text)}
 .xbtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}

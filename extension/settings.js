@@ -5,10 +5,10 @@
 // localStorage holds them, the five older options under the keys they always had.
 (root => {
   const I18n=root.ChatExportI18n||(typeof module!=='undefined'?require('./i18n.js'):null),t=I18n.t;
-  const version='0.11.36';
+  const version='0.11.38';
   const defaults={
     saveAs:false,
-    exportKind:'zip', profile:'generic', htmlForm:'folder', htmlMap:true, autoClose:false,
+    exportKind:'zip', profile:'generic', htmlForm:'single', htmlMap:true, autoClose:false,
     fileName:'title-date', filePrefix:'ChatGPT', fileVersion:false,
     yaml:true, model:true, proseHtml:'escape', htmlCards:false, timestamps:false, sources:false, roleUser:'', roleAssistant:'ChatGPT',
     dockShow:true, dockPos:'input',
@@ -126,7 +126,11 @@
     const base={title:t,'title-date':`${t} - ${d}`,'date-title':`${d} - ${t}`,prefix:`${p} - ${t}`}[values.fileName]||`${t} - ${d}`;
     return values.fileVersion?`${base} - v${version}`:base;
   }
-  const api={version,defaults,choices,profiles,legacy,create,open,kinds,fileNames,fileBase,day,role};
+  // 整段 HTML as one file carries every picture and file inside it, about a third larger than they are.
+  // With more than this many, the sidebar and the toolbar panel suggest the ZIP form (the fixtures have
+  // at most 10, a set of small CSV tables).
+  const bigHtmlFiles=10;
+  const api={version,defaults,choices,profiles,legacy,create,open,kinds,fileNames,fileBase,day,role,bigHtmlFiles};
   root.ChatExportSettings=api;
   if(typeof module!=='undefined')module.exports=api;
 })(globalThis);
