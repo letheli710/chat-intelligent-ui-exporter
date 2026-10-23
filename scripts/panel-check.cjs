@@ -182,7 +182,10 @@ form{position:fixed;bottom:28px;left:calc(260px + (100vw - 260px - 768px) / 2);w
     await sw.evaluate(() => chrome.action.openPopup());
     const obsPopup = await (await browser.waitForTarget(t => t.url() === base + 'popup.html', {timeout:10000})).asPage();
     await obsPopup.waitForFunction(() => /条消息/.test(document.getElementById('chatMeta')?.textContent || ''), {timeout:20000});
-    check(await obsPopup.evaluate(() => /保存到 Obsidian/.test(document.getElementById('export').textContent) && document.getElementById('obsOpen')?.disabled === true), 'the toolbar panel shows the pill too');
+    // ◆ 保存 | 打开 as in the sidebar (the full words in the tooltip), and 选择消息… beside it, not under it.
+    const popupPill = await obsPopup.evaluate(() => {const b = document.getElementById('export'), pill = b.closest('.opill').getBoundingClientRect(), pick = document.getElementById('pick').getBoundingClientRect();
+      return {main:b.textContent, title:b.title, open:document.getElementById('obsOpen')?.disabled === true, apart:pill.right <= pick.left + 1 || pick.top >= pill.bottom - 1, fits:[...b.closest('.opill').children].every(e => e.scrollWidth <= e.clientWidth + 1)};});
+    check(popupPill.main === '保存' && popupPill.title === '保存到 Obsidian' && popupPill.open && popupPill.apart && popupPill.fits, `the toolbar panel shows the pill too, clear of 选择消息… (${JSON.stringify(popupPill)})`);
     // No 「当前对话」 label; the kind list at the end of the info line switches the default kind.
     check(await obsPopup.evaluate(() => !document.querySelector('#hero .xk') && document.getElementById('kindSel').value === 'obsidian'), 'the toolbar panel has no 当前对话 label and its kind list shows Obsidian');
     await obsPopup.select('#kindSel', 'md');await sleep(200);
