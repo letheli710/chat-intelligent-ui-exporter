@@ -123,12 +123,8 @@ The file goes to your Downloads folder (or wherever you choose, see *Settings*).
 
 ```mermaid
 flowchart LR
-    A["ChatGPT tab<br/>(your signed-in session)"] -->|reads the conversation,<br/>like the page does| B["Extension<br/>(runs in your browser)"]
-    B --> C["Markdown · ZIP"]
-    B --> D["HTML page<br/>cards run in a sandbox"]
-    B --> E["PDF<br/>print dialog"]
-    B --> F["Obsidian note"]
-    C & D & E & F --> G[("Your computer")]
+    A["ChatGPT tab<br/><small>your signed-in session</small>"] -->|reads the chat, like the page does| B["Extension<br/><small>runs in your browser</small>"]
+    B -->|"Markdown · ZIP · HTML · PDF · Obsidian"| C[("Your computer")]
 ```
 
 - The extension asks ChatGPT's own website for the conversation, with the sign-in your browser already has. It does not scroll the page or take screenshots of it.

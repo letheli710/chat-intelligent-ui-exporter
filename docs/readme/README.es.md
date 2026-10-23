@@ -125,12 +125,8 @@ El archivo va a tu carpeta de Descargas (o donde elijas; ver *Ajustes*). Para Ob
 
 ```mermaid
 flowchart LR
-    A["Pestaña de ChatGPT<br/>(tu sesión iniciada)"] -->|lee la conversación,<br/>como la página| B["Extensión<br/>(se ejecuta en tu navegador)"]
-    B --> C["Markdown · ZIP"]
-    B --> D["Página HTML<br/>tarjetas en un sandbox"]
-    B --> E["PDF<br/>diálogo de impresión"]
-    B --> F["Nota de Obsidian"]
-    C & D & E & F --> G[("Tu ordenador")]
+    A["Pestaña de ChatGPT<br/><small>tu sesión iniciada</small>"] -->|lee el chat, como la página| B["Extensión<br/><small>se ejecuta en tu navegador</small>"]
+    B -->|"Markdown · ZIP · HTML · PDF · Obsidian"| C[("Tu ordenador")]
 ```
 
 - La extensión pide la conversación al propio sitio de ChatGPT, con la sesión que tu navegador ya tiene. No desplaza la página ni hace capturas de ella.

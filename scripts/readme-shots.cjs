@@ -79,7 +79,6 @@ ${turns.map(m => m.author.role === 'user' ? `<div class="u" data-message-id="${m
     const JSZip = require(path.join(root, 'extension/jszip.min.js')), files = await JSZip.loadAsync(fs.readFileSync(path.join(downloads, zip)));
     const card = Object.keys(files.files).find(f => /^assets\/card-.*\.png$/.test(f));
     if (card) {fs.writeFileSync(path.join(out, 'markdown-card.png'), await files.file(card).async('nodebuffer'));console.log('wrote markdown-card.png');}
-    fs.writeFileSync(path.join(out, 'markdown-sample.md'), await files.file('conversation.md').async('string'));
     // The settings page with its groups open.
     const options = await browser.newPage();await options.setViewport({width:900, height:1000, deviceScaleFactor:2});
     await options.goto(base + 'options.html');await options.waitForSelector('#settings .xset');await sleep(400);

@@ -125,12 +125,8 @@ Die Datei landet in deinem Download-Ordner (oder wo du willst, siehe *Einstellun
 
 ```mermaid
 flowchart LR
-    A["ChatGPT-Tab<br/>(deine angemeldete Sitzung)"] -->|liest das Gespräch,<br/>wie die Seite| B["Erweiterung<br/>(läuft in deinem Browser)"]
-    B --> C["Markdown · ZIP"]
-    B --> D["HTML-Seite<br/>Karten in einer Sandbox"]
-    B --> E["PDF<br/>Druckdialog"]
-    B --> F["Obsidian-Notiz"]
-    C & D & E & F --> G[("Dein Computer")]
+    A["ChatGPT-Tab<br/><small>deine angemeldete Sitzung</small>"] -->|liest das Gespräch wie die Seite| B["Erweiterung<br/><small>läuft in deinem Browser</small>"]
+    B -->|"Markdown · ZIP · HTML · PDF · Obsidian"| C[("Dein Computer")]
 ```
 
 - Die Erweiterung holt das Gespräch von der ChatGPT-Website selbst, mit der Anmeldung, die dein Browser schon hat. Sie scrollt die Seite nicht und macht keine Bildschirmfotos davon.

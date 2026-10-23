@@ -125,12 +125,8 @@ Le fichier va dans votre dossier Téléchargements (ou là où vous le choisisse
 
 ```mermaid
 flowchart LR
-    A["Onglet ChatGPT<br/>(votre session connectée)"] -->|lit la conversation,<br/>comme la page| B["Extension<br/>(dans votre navigateur)"]
-    B --> C["Markdown · ZIP"]
-    B --> D["Page HTML<br/>cartes dans un bac à sable"]
-    B --> E["PDF<br/>boîte d’impression"]
-    B --> F["Note Obsidian"]
-    C & D & E & F --> G[("Votre ordinateur")]
+    A["Onglet ChatGPT<br/><small>votre session connectée</small>"] -->|lit la conversation, comme la page| B["Extension<br/><small>dans votre navigateur</small>"]
+    B -->|"Markdown · ZIP · HTML · PDF · Obsidian"| C[("Votre ordinateur")]
 ```
 
 - L’extension demande la conversation au site de ChatGPT lui-même, avec la connexion que votre navigateur a déjà. Elle ne fait pas défiler la page et n’en prend pas de capture.

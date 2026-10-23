@@ -125,12 +125,8 @@ Chrome 向けです。Manifest V3 に対応したほかの Chromium 系ブラウ
 
 ```mermaid
 flowchart LR
-    A["ChatGPT のタブ<br/>（ログイン中のセッション）"] -->|ページと同じように<br/>会話を読み込む| B["拡張機能<br/>（ブラウザ内で動作）"]
-    B --> C["Markdown · ZIP"]
-    B --> D["HTML ページ<br/>カードはサンドボックスで動作"]
-    B --> E["PDF<br/>印刷ダイアログ"]
-    B --> F["Obsidian のノート"]
-    C & D & E & F --> G[("あなたのパソコン")]
+    A["ChatGPT のタブ<br/><small>ログイン中のセッション</small>"] -->|ページと同じように会話を読む| B["拡張機能<br/><small>ブラウザ内で動作</small>"]
+    B -->|"Markdown · ZIP · HTML · PDF · Obsidian"| C[("あなたのパソコン")]
 ```
 
 - 拡張機能は、ブラウザがすでに持っているログイン状態で ChatGPT のサイトから会話を読み込みます。ページをスクロールしたり、画面を撮ったりはしません。

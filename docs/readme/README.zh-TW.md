@@ -125,12 +125,8 @@ ChatGPT 的回答早就不只是文字了：表格、公式、生成的圖片、
 
 ```mermaid
 flowchart LR
-    A["ChatGPT 分頁<br/>（你已登入的工作階段）"] -->|像頁面那樣<br/>讀取對話| B["擴充功能<br/>（在你的瀏覽器裡執行）"]
-    B --> C["Markdown · ZIP"]
-    B --> D["HTML 網頁<br/>卡片在沙箱裡執行"]
-    B --> E["PDF<br/>列印對話框"]
-    B --> F["Obsidian 筆記"]
-    C & D & E & F --> G[("你的電腦")]
+    A["ChatGPT 分頁<br/><small>你已登入的工作階段</small>"] -->|像頁面那樣讀取對話| B["擴充功能<br/><small>在你的瀏覽器裡執行</small>"]
+    B -->|"Markdown · ZIP · HTML · PDF · Obsidian"| C[("你的電腦")]
 ```
 
 - 擴充功能用瀏覽器已有的登入狀態，向 ChatGPT 自己的網站讀取對話。不捲動頁面，也不擷取頁面畫面。

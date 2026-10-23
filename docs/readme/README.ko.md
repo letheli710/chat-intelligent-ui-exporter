@@ -125,12 +125,8 @@ Chrome용입니다. Manifest V3를 지원하는 다른 Chromium 브라우저(Edg
 
 ```mermaid
 flowchart LR
-    A["ChatGPT 탭<br/>(로그인된 세션)"] -->|페이지처럼<br/>대화를 읽음| B["확장 프로그램<br/>(브라우저 안에서 실행)"]
-    B --> C["Markdown · ZIP"]
-    B --> D["HTML 웹페이지<br/>카드는 샌드박스에서 실행"]
-    B --> E["PDF<br/>인쇄 대화상자"]
-    B --> F["Obsidian 노트"]
-    C & D & E & F --> G[("내 컴퓨터")]
+    A["ChatGPT 탭<br/><small>로그인된 세션</small>"] -->|페이지처럼 대화를 읽음| B["확장 프로그램<br/><small>브라우저 안에서 실행</small>"]
+    B -->|"Markdown · ZIP · HTML · PDF · Obsidian"| C[("내 컴퓨터")]
 ```
 
 - 확장 프로그램은 브라우저가 이미 가진 로그인 상태로 ChatGPT 사이트에서 대화를 읽습니다. 페이지를 스크롤하거나 화면을 캡처하지 않습니다.
