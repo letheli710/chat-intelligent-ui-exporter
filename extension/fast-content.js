@@ -1,5 +1,5 @@
 (function mount(again={}){
-  const version='0.11.39';
+  const version='0.11.41';
   // On chatgpt.com the manifest keeps this script in every tab (resident.js says so): the two
   // buttons beside the input box are always there and open the sidebar. Injected by hand (tests,
   // the live bundle) the sidebar opens at once, and injecting it again shows or hides it.
@@ -510,7 +510,7 @@
   function syncSettings(){const v=cfg(),k=v.exportKind;$('kind').value=k;
     // Obsidian: 「导出」 becomes the pill 保存到 Obsidian | 打开 (here, in the sidebar and the toolbar panel).
     // Beside the input box and in the sidebar it reads ◆ 保存 | 打开 (the full words in the tooltip), so it
-    // keeps its text where 导出 · 完整归档 does.
+    // keeps its text where 导出 · MD 压缩包 does.
     const obs=k==='obsidian';
     D('dExport').innerHTML=obs?`${icon('gem')}<span>${esc(t('side.save'))}</span>`:`${icon(UI.kindIcon[k])}<span>${esc(t('side.export'))}</span><small>${esc(Settings.kinds[k].short)}</small>`;
     D('dOpen').hidden=$('obsOpen').hidden=!obs;$('exportPill').classList.toggle('two',obs);fitPill();$('export').textContent=obs?t('side.save'):t('side.export');$('export').title=D('dExport').title=obs?Settings.kinds.obsidian.verb:'';obsidianState();

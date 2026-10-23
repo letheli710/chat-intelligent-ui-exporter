@@ -1,6 +1,6 @@
 {
   "name": "chat-intelligent-ui-exporter",
-  "version": "0.11.39",
+  "version": "0.11.41",
   "description": "本项目开发适配 ChatGPT 新界面的 Chrome 导出插件，重点保存对话中有价值的讨论及上下文。用户选择消息或内容片段后，导出 Markdown 与本地资产包；正文保留为可检索文字，普通图片与 SVG 优先保存原始资产，其他可视化和少见的自生成工具用截图保存当前画面。",
   "scripts": {
     "test": "node --test --test-force-exit tests/*.test.cjs",
