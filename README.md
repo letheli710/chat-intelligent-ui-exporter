@@ -1,109 +1,233 @@
-# Chat & Intelligent UI Exporter for ChatGPT
+<p align="center">
+  <img src="extension/icons/icon128.png" width="96" height="96" alt="">
+</p>
 
-把 ChatGPT 对话导出为 Markdown 和本地资源包的 Chrome 扩展（Manifest V3），方便归档到 Obsidian 等笔记软件；也可以把整段对话导出成一个尽量还原现场的 HTML 页面（卡片可以操作），或者排成 PDF 打印保存。当前版本 **0.11.41**。
+<h1 align="center">Chat &amp; Intelligent UI Exporter for ChatGPT</h1>
 
-全程在浏览器本地运行，不调用任何 AI 服务。扩展自己不收集对话，也不把对话上传给开发者或任何第三方。正文、原图和界面数据直接从 ChatGPT 的会话接口读取，不需要滚动页面或截图，长对话通常一秒内导出完，标签页在后台也能完成。如果对话正文或生成的组件（嵌入应用、外部图片、地图）本身引用了网络资源，预览或打开导出文件时，浏览器会像打开普通网页一样请求这些资源。隐私说明见 [PRIVACY.md](PRIVACY.md)。
+<p align="center">
+  Save ChatGPT conversations, including their interactive <b>Intelligent UI</b> cards,<br>
+  as Markdown, HTML, PDF or straight into Obsidian. Everything happens on your computer.
+</p>
 
-## 能导出什么
+<p align="center">
+  <img alt="Version" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fletheli710%2Fchat-intelligent-ui-exporter%2Fmain%2Fextension%2Fmanifest.json&query=%24.version&label=version&color=6f8f7f">
+  <img alt="Manifest V3" src="https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white">
+  <img alt="10 languages" src="https://img.shields.io/badge/UI-10%20languages-8a7f72">
+  <img alt="No tracking" src="https://img.shields.io/badge/data-stays%20local-3f8f5f">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
+</p>
 
-- **正文**：保留为可编辑的 Markdown，包括表格、代码块、公式、引用来源链接。文档用 `#` 写标题、`##` 分隔每条消息，回答里自带的标题统一降两级（从 `###` 开始），Obsidian 大纲层次不乱。一轮回答即使被拆成多条消息（工具调用前的说明、工具输出、最终回答），也合在同一个“ChatGPT”小节里；链接去掉 ChatGPT 附加的 `utm_source=chatgpt.com`。
-- **附件**：用户上传的 PDF、表格等非图片文件下载到 `files/`，在该条提问上方链接为“附件：文件名”。
-- **图片**：上传的图片、生成的图片、搜索结果插图，均下载原图到 `assets/`。一组搜索插图合成一张缩略图拼图，原图列在下方折叠区里。
-- **代码解释器**：输出的图表和生成的文件下载到本地，文件放在 `files/`，正文中的链接改为本地路径。只出现在卡片数据里、正文没有链接的文件（如文件下载卡片）也会下载，并在该条回答末尾列为“代码生成的文件”。以可滚动表格展示的 DataFrame 保存为完整 CSV，正文里显示前 10 行。
-- **界面卡片**（Intelligent UI）：每张图片单独配一段文字的“图文列表”卡片写成 Markdown 表格（左列缩略图，点开是原图；右列文字可编辑）。面板里可勾选“图文卡片：Markdown + HTML 并排”（**Beta**），改为 HTML 左图右文，更接近 ChatGPT 原样；它仍在测试，个别卡片可能显示异常，且只有 Obsidian 这类能显示 HTML 的软件看得到。两种导出用途都默认关闭（写成稳定的表格），要手动打开。其他卡片在扩展的沙箱页里离屏画成 PNG，卡片里的搜索插图一并画进去，卡片文字保留在可折叠的引用块中。表格（或 HTML）的任何一步失败（图片未下载、无法解码等）都退回 PNG；PNG 也没有时只保留文字。每张卡片最终用了哪种写法、为什么退回，记录在 manifest.json 的 `cards` 里。卡片只在其他状态下才显示的文字（别的标签页、展开后的折叠区、勾选后出现的内容），列在回答末尾的折叠块“卡片在其他状态下的内容”里。卡片上的文字按原样导出：`*`、`` ` ``、`<`、`&`、`#`、`$` 这类符号前面加反斜杠，在 Markdown 和 Obsidian 里不会变成粗斜体、代码、HTML、标签或公式。
-  - 想在真实页面上演练退回：在 ChatGPT 标签页的控制台运行 `localStorage.chatExportFault='thumb'`（可选 `list` / `image` / `thumb` / `table` / `png`），导出后用 `localStorage.removeItem('chatExportFault')` 关掉。
-- **嵌入应用**（AppBlock，如 WebGL、canvas、动画演示）：运行约 1 秒后截一张预览图，并保留打开原应用的链接。
-- **地图**：从页面上截取 ChatGPT 已经画好的地图（带评分标记），下面是地点列表，包括名称（链接到官网或 Yelp）、类别、评分、地址、地图链接和简介。截图需要标签页在前台；截不到时只保留地点列表。
+<p align="center">
+  <b>English</b> ·
+  <a href="docs/readme/README.zh-CN.md">简体中文</a> ·
+  <a href="docs/readme/README.zh-TW.md">繁體中文</a> ·
+  <a href="docs/readme/README.ja.md">日本語</a> ·
+  <a href="docs/readme/README.ko.md">한국어</a> ·
+  <a href="docs/readme/README.es.md">Español</a> ·
+  <a href="docs/readme/README.pt-BR.md">Português</a> ·
+  <a href="docs/readme/README.fr.md">Français</a> ·
+  <a href="docs/readme/README.de.md">Deutsch</a> ·
+  <a href="docs/readme/README.ru.md">Русский</a>
+</p>
 
-### 整段对话导出为 HTML
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#what-you-get">What you get</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#faq">FAQ</a> ·
+  <a href="PRIVACY.md">Privacy</a> ·
+  <a href="#feedback">Feedback</a>
+</p>
 
-面板里的“整段对话导出为 HTML”把对话做成一个外观接近 ChatGPT 的网页（样式是自己写的，没有用 OpenAI 的 CSS、字体或标志），目标是信息完整、打开就能看：
+<p align="center">
+  <img src="docs/images/sidebar.png" width="860" alt="The export sidebar open beside a ChatGPT conversation, with every message ticked and HTML page chosen as the format">
+</p>
 
-- **正文**：标题、列表、表格、代码块（带“复制”）、引用、图片；公式用浏览器原生的 MathML 显示，LaTeX 源码保留在里面，复制、搜索都能找到；你的提问按原样显示为文字气泡，附件是可点开的文件卡片。
-- **界面卡片**：每张卡片在一个沙箱 iframe 里重新运行这条消息的界面程序（`model_dil_v2.code`），**可以操作**：标签页、滑块、下拉、单选、复选、折叠、按钮都会改变卡片内容，从**默认状态**开始（ChatGPT 不保存你在页面上点过的状态）。同一条回答里的几张卡片共享状态。“复制”按钮会复制并提示“已复制”；会在 ChatGPT 里发送新消息的按钮，提示原本会发送的内容。图表下方可展开“图表数据”。卡片的默认画面同时作为静态副本写在页面里，没有脚本、打印或卡片出错时显示它。
-- **嵌入应用**（AppBlock：WebGL、canvas、动画、SVG）：原样放进沙箱 iframe（`srcdoc`）运行，高度随内容调整；“新窗口打开”可单独查看。打印时显示导出时的预览图。应用本身要加载网络资源（例如外部库或数据）时，会照常联网。
-- **地图**：打开页面时地图**不联网**，显示导出时从页面截取的地图画面（截不到时显示提示），下面是文字地点列表。选项“地图旁提供‘联网查看可拖动地图’按钮”打开时（默认开），读者点这个按钮才从 OpenStreetMap 加载图块，画出可拖动、可缩放、带地点标记的地图（滚轮照常滚动页面，按住 Ctrl 滚轮或点 + − 缩放）；4 秒内一张图块都没加载出来、第一张就出错，或之后连续出错，自动回到截图并提示“地图服务连不上”。同一个按钮会变成“返回截图”，用于图块显示不对（例如服务返回“禁止访问”的图片，页面分辨不出）的情况。地图旁的 ⓘ 有说明。地图本身不加载任何外部脚本，也不调用 AI 服务；关掉选项则地图不会联网。正文里的网络图片、嵌入应用请求的资源不受这个选项控制，打开页面时照常加载。
-- **两种形式**，在设置「HTML 网页的形式」里选（旁边的 ⓘ 点开有说明页），打开后显示完全一样：
-  - **单个 HTML 文件**（默认）：所有图片和文件都以 base64 写进同一个文件，方便发送；体积比原文件大约多三分之一，图片多时较大。要导出的图片和附件超过 10 个时，侧边栏底部的文件名和工具栏面板里对话下方的信息行会变成一句可点的建议「⚠ 文件较大，建议改用多文件 →」（悬停看图片和附件的数量），点一下就换成 ZIP（只换这一行的文字，面板不会跳动）。
-  - **ZIP：HTML + assets 文件夹**：`conversation.html`、`assets/`（图片）、`files/`（附件、代码生成的文件、CSV）、`manifest.json`。保持它们相邻。
-  - 0.11.37 起默认是单个文件；之前已经选过 ZIP 的，保持 ZIP。
-  - 两种形式都把卡片程序和数据写在页面里、iframe 都用 `srcdoc`，所以直接双击用 `file://` 打开也能完整运行。
+## Why this exists
 
-可以导出整段对话，也可以只勾选部分消息。已保存的对话（`/c/…`）和分享链接（`/share/…`）都能导出；面板打开时切换到别的对话，会自动重新读取。
+ChatGPT answers are no longer just text. They hold tables, formulas, generated images, files from the code interpreter and, more and more often, **interactive cards** (Intelligent UI) with tabs, sliders and buttons. Copy-paste loses most of that, and ChatGPT's own data export gives you raw JSON.
 
-## 安装
+This extension reads the conversation the way the ChatGPT page does and writes it out completely:
 
-1. Chrome 地址栏输入 `chrome://extensions`，打开右上角“开发者模式”。
-2. 点击“加载已解压的扩展程序”，选择本项目的 `extension` 文件夹。
-3. 打开 ChatGPT 的一个对话，点击扩展图标，页面上出现导出面板。
+- **Nothing is lost.** Text stays editable, original images and files are downloaded, and every card is kept as a picture *plus* its text, so it is still searchable.
+- **Cards keep working.** In the HTML export, cards run again: switch tabs, move sliders, see the numbers change.
+- **Private by design.** No server, no account, no analytics, no AI calls. See [PRIVACY.md](PRIVACY.md).
 
-**更新代码后**，要在 `chrome://extensions` 里点该扩展的“重新加载”，再刷新 ChatGPT 页面。面板每次点击都会从磁盘读取最新代码，但后台脚本和权限只在重新加载后才更新；两者版本不一致时，面板会提示。
+## What you get
 
-## 使用
+| Format | File | Best for |
+| --- | --- | --- |
+| **Markdown text only** | `.md` | Notes apps, quick copies. Markdown with tables, code, formulas and source links. |
+| **Markdown package** | `.zip` | Keeping everything: Markdown plus original images, card pictures, attached and generated files. |
+| **HTML page** | `.html` (or `.html.zip`) | Reading and sharing. Looks like ChatGPT, and the cards are interactive. |
+| **PDF (print)** | via the print dialog | Printing and handing in. Real text you can select and search, A4 layout. |
+| **Obsidian** | a note in your vault | Saves into a folder you pick and opens the note. |
 
-- **全选 / 清空 / 勾选**：选择要导出的消息。
-- **导出用途**：选“通用 Markdown”或“Obsidian”。两者目前只有“正文里的 HTML”的默认值不同，选完后每一项仍可手动改；用途和两个选项都记在本浏览器里。
+You can export a whole conversation or only the messages you tick, from saved chats (`/c/…`) and shared links (`/share/…`). Long conversations usually finish in about a second, even with the tab in the background.
 
-  | | 通用 Markdown（默认） | Obsidian |
-  | --- | --- | --- |
-  | 图文卡片：Markdown + HTML 并排（Beta） | 关：表格，其他卡片是 PNG 加折叠文字 | 关（同左；生成的 HTML 还没有写入前的检查，可手动打开） |
-  | 正文里的 HTML | 转义，显示为文字 | 原样保留 |
+### Intelligent UI cards, kept two ways
 
-  “正文里的 HTML”指 ChatGPT 在普通回答（或提问）正文里直接写出的 HTML 标签，例如 `<svg>`、`<details>`。ChatGPT 页面把它们显示为文字，Obsidian 却会当作 HTML 显示出来。通用 Markdown 面向可能去掉 HTML 的软件（GitHub、Notion 导入、纯文本编辑器），把标签的 `<` 写成 `&lt;`，各处都显示为文字，与 ChatGPT 页面一致；代码块、行内代码、公式和 `<https://…>` 这类自动链接不受影响。正文 HTML 不会被转成图片。卡片文字一直按原样转义，与这个选项无关。所用的用途和选项记录在 manifest.json 的 `exportProfile` 里。
-- **预览文字**：先看导出的 Markdown。
-- **下载 Markdown**：只要正文。
-- **下载 ZIP（原图 + 界面数据）**：完整导出，推荐。
-- **整段对话导出为 HTML → 下载 HTML**：选“形式”（单个文件 / ZIP 文件夹）和是否在地图旁提供联网地图按钮，见上文。两个选择也记在本浏览器里。
-- **导出 PDF（打印）**：内容同 ZIP，排成纸面，在打印对话框里另存为 PDF，见下面的“PDF”。
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <b>HTML page: the card still works</b><br><br>
+      <img src="docs/images/html-export.png" alt="An exported HTML page showing the Kyoto trip budget card with a Budget / Comfort / Luxury switch, a days slider and a cost table">
+    </td>
+    <td width="50%" valign="top">
+      <b>Markdown: a picture plus searchable text</b><br><br>
+      <img src="docs/images/markdown-card.png" alt="The card drawn as a picture for the Markdown export">
+<pre lang="markdown">![Interactive card](assets/card-a2-1.png)
 
-ZIP 解压后：
+&gt; [!note]- Card text
+&gt; **Kyoto trip budget** · [Estimate]
+&gt; Options: Budget / **Comfort** / Luxury
+&gt; | Item  | Per day | Total |
+&gt; | Hotel | \$160   | \$480 |
+&gt; …</pre>
+    </td>
+  </tr>
+</table>
 
+Text that a card only shows in another state (another tab, an opened section) is listed under *Card content in other states*, so nothing hides behind a click. The details of every format are in [docs/export-formats.md](docs/export-formats.md).
+
+## Install
+
+> [!NOTE]
+> The Chrome Web Store listing is on its way. Until then, load the extension from this repository.
+
+1. Download this repository ([**Code → Download ZIP**](https://github.com/letheli710/chat-intelligent-ui-exporter/archive/refs/heads/main.zip)) and unzip it, or `git clone` it.
+2. Open `chrome://extensions` and turn on **Developer mode** (top right).
+3. Click **Load unpacked** and choose the `extension` folder.
+4. Open a conversation on [chatgpt.com](https://chatgpt.com). Two buttons appear beside the input box.
+
+Made for Chrome. Other Chromium browsers with Manifest V3 (Edge, Brave) should work too, but are not tested.
+
+## Quick start
+
+<img src="docs/images/popup.png" width="300" align="right" alt="The toolbar panel: the current chat, its export format and the Export HTML button, with settings below">
+
+1. **Open a ChatGPT conversation.**
+2. **Click the export button** beside the input box, or the extension icon in the toolbar.
+3. **Pick a format** from the menu next to it. That choice is remembered.
+4. Want only part of the chat? Open the **sidebar** (the list button, or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>), tick the messages, then **Export**.
+
+The file goes to your Downloads folder (or wherever you choose, see *Settings*). For Obsidian, you pick your notes folder once; after that, **Save** writes the note and **Open** jumps to it.
+
+<br clear="right">
+
+<p align="center">
+  <img src="docs/images/buttons.png" width="680" alt="The two buttons beside the ChatGPT input box: select messages, and export">
+</p>
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["ChatGPT tab<br/><small>your signed-in session</small>"] -->|reads the chat, like the page does| B["Extension<br/><small>runs in your browser</small>"]
+    B -->|"Markdown · ZIP · HTML · PDF · Obsidian"| C[("Your computer")]
 ```
-<对话标题>-swift-0.8.32/
-├── conversation.md    正文
-├── assets/            图片、卡片 PNG、AppBlock 预览图
-├── files/             代码解释器生成的文件
-├── ui/                每条消息的界面原始数据（JSON）
-└── manifest.json      导出版本、消息列表、耗时与警告
-```
 
-保持 `conversation.md` 和 `assets/` 相邻，图片才能正常显示。
+- The extension asks ChatGPT's own website for the conversation, with the sign-in your browser already has. It does not scroll the page or take screenshots of it.
+- Cards are drawn by running the card's program in an isolated sandbox page inside the extension, so the picture matches what ChatGPT shows.
+- Nothing goes to a server of ours, because there is none.
 
-## PDF（0.11.0 起）
+## Settings
 
-面板里点 **导出 PDF（打印）**：排好版后，浏览器的打印对话框直接在当前 ChatGPT 页面上弹出（排版在页面里一个看不见的框架中完成，不打开新标签页），“目标打印机”选 **另存为 PDF** 即可保存。PDF 是把对话定格成纸面的静态版：打开对话时默认能看到的内容都在里面，交互元素一律定格。
+Open them from the gear in the sidebar, the toolbar panel, or the extension's options page. The ⓘ next to a setting explains it; some open a page with examples.
 
-- **生成方式**：不截图拼接，而是用文字加排版生成，文字能选中、能搜索，链接能点。内容与 Markdown 压缩包（.zip）相同（正文、原图、卡片图、AppBlock 预览图、地图截图），只是排成 A4 纸面；不读页面、不联网、不调用任何 AI 服务。打印页是扩展自带的 `print.html`，不需要新权限。
-- **卡片**：画成默认状态的图片；比一页还高的卡片在空白行处切开，跨页接着画。图文列表卡片（每张图配一段文字）与 ZIP 一样先走稳定的表格写法，在纸面上排成左图右文的列表，文字能选中、链接能点；做不成表格时才用卡片图。卡片上的文字不再在图下面重复一遍，而是作为看不见的文字留在卡片图后面（按阅读顺序），PDF 里照样能搜索、能复制；卡片没画出来的内容（嵌入应用预览图和链接）仍显示在图下。“卡片在其他状态下的内容”（别的标签页、默认收起的折叠区等）放在回答末尾。
-- **折叠内容一律展开**：Markdown 里折叠的块（卡片文字、原图列表、其他状态、默认未显示的嵌入应用）在 PDF 里都展开。
-- **ChatGPT 页面自己折叠的部分**：思考过程、代码解释器运行的代码和中间输出，Markdown 不导出，PDF 也不放（它们不是回答本身；面板以后加“思考过程”开关时，PDF 跟着展开）。引用来源保留为正文里可点的链接，页面侧栏的来源列表不另列。代码解释器生成的图表、文件照常在正文里（文件只列文件名，文件本身在 ZIP 里）。
-- **版式**：A4 纵向，页脚印页码。长代码自动换行，不横向滚动。宽表格先断开长串、缩小字号，仍放不下就单独放一页横排。用户的提问保留换行，不当公式解析；回答里的公式转成可读文字（上下标、分数、希腊字母），矩阵、多行公式是近似文字。正文里写出的 HTML 显示为文字，与 ChatGPT 页面一致。
-- **字体**：用系统字体，由 Chrome 嵌入 PDF（Windows 实测：中文微软雅黑、西文 Segoe UI、代码 Cascadia Mono、公式 Cambria Math，全部以子集嵌入；macOS 应为苹方，未实测）。
-- **页眉页脚与文件名**（0.11.7 起）：Chrome 自己的页眉页脚（日期、标题、网址）不再出现，即使打印对话框里勾着“页眉和页脚”：打印页在上下页边各放了自己的内容（上面留空，下面是页码），Chrome 只在没有这类内容的页边印它的页眉页脚。以前的页眉用的字体在 PDF 文字层里会变成康熙部首（⽣⼤⽚），搜索不到。另存为 PDF 的默认文件名就是对话标题（如“生成大型测试卡片.pdf”）。背景色不受“背景图形”选项影响。
+<details>
+<summary><b>See the settings page</b></summary>
+<br>
+<img src="docs/images/settings.png" width="560" alt="The settings page: default export, made for Generic or Obsidian, form of the HTML page, file name, Markdown content">
+</details>
 
-已知限制：
-- ZWJ 组合表情（👨‍👩‍👧‍👦）、天城文和马拉雅拉姆文的连写字形能正常显示，但 Chrome 没有给它们写入文字层，复制、搜索时会缺字；阿拉伯文复制出来是显示顺序。
-- 地图要在 ChatGPT 标签页里截取，规则与 ZIP 相同：截不到时只保留地点列表。
-- 没有下载到的图片显示为“〔图片未下载：…〕”，不会联网补取。
+| Setting | What it changes |
+| --- | --- |
+| **Made for**: Generic / Obsidian | Generic shows HTML that ChatGPT wrote inside an answer as text, so it reads the same everywhere; Obsidian keeps it working (collapsible blocks, small images). |
+| **Form of the HTML page** | One file (the default, easy to send) or a ZIP with folders (smaller page, better for many pictures). [More](docs/export-formats.md#html-page) |
+| **File name** | Title, title and date, date and title, or a prefix of your own. |
+| **Markdown content** | Obsidian properties (title, source, time, model), message times, role names. |
+| **Picture cards as HTML** (Beta) | Writes image-and-text list cards as HTML side by side instead of a table. |
+| **Choose where to save** | Asks for a folder on every export instead of using Downloads. |
+| **Language** | Follows your browser, or pick one of 10 languages. |
 
-## 尚不支持
+## Privacy and permissions
 
-重新生成的其他回答（只导出当前显示的那一个）；卡片的组合状态（只能还原默认状态）。
+The extension never sends your conversations anywhere. The full policy is in [PRIVACY.md](PRIVACY.md); in short:
 
-## 开发
+| Permission | Why it is needed |
+| --- | --- |
+| `chatgpt.com`, `chat.openai.com` | To show the buttons and read the conversation you are looking at. |
+| `images.openai.com` | To download the pictures from search results, without cookies. |
+| `scripting` | To add the panel to ChatGPT tabs that were already open when the extension was installed or updated. |
+| `downloads` | To save the exported file. |
+| `storage` | To remember your settings, on your computer only. |
 
-```bash
-npm install
-npm test
-```
+> [!TIP]
+> An exported HTML page behaves like any web page: if the chat itself points to pictures or apps on the web, your browser loads them when you open the file. The map stays offline unless you click *Open the draggable map online*.
 
-- `extension/`：扩展本体。改动扩展时，同步提升 `manifest.json`、`extension/fast-content.js` 和 `package.json` 中的版本号，`tests/version.test.cjs` 会检查三者一致。
-- `tests/`：测试。大部分回归测试读取 `tests/fixtures/`（在 chatgpt.com 上专门建的测试对话的抓取）和 `archive/` 下的本地样本。这些都不进公开仓库，缺少时相关测试自动跳过；`html-check`、`pdf-check`、`panel-check` 也要用到它们。
-- `extension/html-export.js`：整段对话的 HTML 导出（页面结构、样式、页面内脚本）；卡片的实时渲染在 `dil-render.js` 的 `mountLive`，只扩展、不改 Markdown 路径。`extension/marked.min.js` 是本地打包的 marked（MIT），把正文 Markdown 转成 HTML。
-- `scripts/html-check.cjs`：离线核对 HTML 导出（`node scripts/html-check.cjs [--out 目录] [名称]`）：对 `tests/fixtures/` 里的每个对话导出两种形式，检查 Markdown 导出的每行文字都在页面上、引用的文件都在、每张卡片能运行且操作后内容会变、每个 AppBlock 都有 iframe、两种形式的文字和元素一致。
-- `scripts/live/`：在真实的 chatgpt.com 标签页里运行当前代码（`bundle.cjs` → 粘贴 → `receive.cjs`）；设 `window.__liveHtml='single'|'folder'` 时导出 HTML。占用共享剪贴板，用前创建 `C:\Workspace\Project\live-export.lock`。
-- `scripts/package.cjs`：`npm run package` 打包到 `releases/`。
-- `scripts/pdf-check.cjs`：`npm run pdf-check` 把 `tests/fixtures/` 里的每个对话离线导出成 PDF（面板代码在 jsdom 里运行，卡片和 AppBlock 预览用无头 Chrome 画，其他图片是占位图），再用 pdf.js 读回检查：Markdown 每行文字都在、图片都在且卡片没被截断、链接与 Markdown 一致且可点、字体已嵌入且中文正常、页数合理、没有空白页。加 `--shots` 输出每页截图。结果在 `tmp/pdf-check/`。需要本机 Chrome（或设 `CHROME_PATH`）。
-- `archive/`：本地归档（旧版本导出、研究记录、历史文档、0.6 时代的页面截图代码与测试），已加入 `.gitignore`，不会推送。
+## FAQ
 
-请勿提交 HAR、cookie、Authorization 头、token、原始会话 JSON 或私人对话截图。
+<details>
+<summary><b>The keyboard shortcut does nothing, or opens the toolbar panel instead of the sidebar.</b></summary>
+
+Chrome only assigns the suggested <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd> when the extension is first installed, and not if another extension already uses those keys. Open `chrome://extensions/shortcuts` and set the row **Open / close the export sidebar**. The other row, Chrome's own, opens the toolbar panel. The extension's settings show which key is set right now.
+</details>
+
+<details>
+<summary><b>One HTML file or ZIP?</b></summary>
+
+Both look and work the same. One file is easiest to send but is about a third larger than the pictures in it. With many pictures, ZIP opens faster and lets you take the originals out. When a chat has more than 10 pictures and files, the extension suggests ZIP for you, one click away.
+</details>
+
+<details>
+<summary><b>Some parts of an answer are replaced by a "Removed" box in the HTML page.</b></summary>
+
+When HTML that ChatGPT wrote is kept, anything that could run code (embedded pages, players, forms, script links) is removed before it goes into your file. The box says what was removed and links to [docs/html-filter.md](docs/html-filter.md), which explains each case.
+</details>
+
+<details>
+<summary><b>Does it export the other answers I regenerated?</b></summary>
+
+Not yet: only the answer currently shown on the page. Cards are exported in their default state, because ChatGPT does not save what you clicked; other states are listed as text.
+</details>
+
+<details>
+<summary><b>The images are missing in my Markdown app.</b></summary>
+
+Keep `conversation.md` next to its `assets/` folder; the images are linked relatively. Use **Markdown package (.zip)** to get the images; **Markdown text only** writes just the Markdown.
+</details>
+
+<details>
+<summary><b>Does it work with shared links and the free plan?</b></summary>
+
+Yes. Saved chats and shared links both work, on any plan. You need to be signed in for your own chats; shared links work signed out as long as ChatGPT shows them.
+</details>
+
+<details>
+<summary><b>Is anything sent to OpenAI or to you?</b></summary>
+
+The extension only talks to ChatGPT's website to read the conversation you asked to export, as the page itself does. Nothing is sent to the developer. The *Report a problem* link opens a Google Form, and nothing is sent unless you submit it.
+</details>
+
+## Documentation
+
+- [Export formats in detail](docs/export-formats.md): what each format contains, the ZIP layout, how cards, maps, embedded apps and PDF pages are handled.
+- [What the HTML export removes, and why](docs/html-filter.md)
+- [Privacy policy](PRIVACY.md)
+- [Development guide](docs/DEVELOPMENT.md): building, tests and checks, how the screenshots above are made.
+- [Third-party notices](extension/THIRD_PARTY_NOTICES.md)
+
+## Feedback
+
+- Something broke or could be better? Use **Report a problem** at the bottom of the toolbar panel. It opens a [short form](https://docs.google.com/forms/d/e/1FAIpQLSemj8AaDckqB2NJ_tsb3VW2jG1AxM-NIrmKJMom8IXtjUYgaQ/viewform) with your version and browser filled in.
+- Prefer GitHub? [Open an issue](https://github.com/letheli710/chat-intelligent-ui-exporter/issues). Please do not attach real conversations, HAR files or cookies.
+- Pull requests are welcome; start with the [development guide](docs/DEVELOPMENT.md).
+
+## Acknowledgements
+
+Built with [marked](https://github.com/markedjs/marked) (Markdown to HTML), [JSZip](https://stuk.github.io/jszip/) (archives) and [Lucide](https://lucide.dev) (card icons). Code-fence sizing and KaTeX annotation extraction are adapted from [otaliptus/chatgpt-markdown-exporter](https://github.com/otaliptus/chatgpt-markdown-exporter). Licenses are in [extension/licenses](extension/licenses).
+
+## License
+
+[MIT](LICENSE). This project is not affiliated with, endorsed by or sponsored by OpenAI. ChatGPT is a trademark of OpenAI.
