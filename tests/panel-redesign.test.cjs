@@ -120,12 +120,12 @@ async function residentPage({stored={},url='https://chatgpt.com/c/chat',conversa
 test('on chatgpt.com the buttons are there, the sidebar opens from them, and nothing is read before it is needed',async()=>{
   const p=await residentPage(),{host,dock,w}=p,d=dock.shadowRoot;
   assert.ok(host.hidden,'the sidebar starts closed');assert.ok(!dock.hidden,'the buttons show');
-  assert.equal(d.getElementById('dExport').textContent,'导出完整归档');assert.equal(d.querySelector('.vtag'),null,'no version under the buttons (the user, 2026-10-20)');assert.match(d.querySelector('.mfoot').textContent,new RegExp(`v${Settings.version.replace(/\./g,'\\.')}$`));
+  assert.equal(d.getElementById('dExport').textContent,'导出MD 压缩包');assert.equal(d.querySelector('.vtag'),null,'no version under the buttons (the user, 2026-10-20)');assert.match(d.querySelector('.mfoot').textContent,new RegExp(`v${Settings.version.replace(/\./g,'\\.')}$`));
   assert.equal(host.shadowRoot.querySelectorAll('#list input').length,0,'not read yet');
   // The export menu switches the default. Obsidian turns 「导出」 into the pill 保存到 Obsidian | 打开
   // (打开 off until this chat has a saved note), here and in the sidebar.
   d.querySelector('[data-kind="md"]').click();await new Promise(r=>setTimeout(r));
-  assert.equal(p.s.data.exportKind,'md');assert.equal(d.getElementById('dExport').textContent,'导出仅文字');assert.equal(d.querySelector('.mi.soon'),null);assert.ok(d.getElementById('dOpen').hidden);
+  assert.equal(p.s.data.exportKind,'md');assert.equal(d.getElementById('dExport').textContent,'导出MD 纯文字');assert.equal(d.querySelector('.mi.soon'),null);assert.ok(d.getElementById('dOpen').hidden);
   d.querySelector('[data-kind="obsidian"]').click();await new Promise(r=>setTimeout(r));
   assert.equal(p.s.data.exportKind,'obsidian');assert.equal(d.getElementById('dExport').textContent,'保存');assert.equal(d.getElementById('dExport').title,'保存到 Obsidian');assert.ok(!d.getElementById('dOpen').hidden);assert.ok(d.getElementById('dOpen').disabled);
   assert.equal(host.shadowRoot.getElementById('export').textContent,'保存');assert.ok(!host.shadowRoot.getElementById('obsOpen').hidden);

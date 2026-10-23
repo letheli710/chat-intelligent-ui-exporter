@@ -298,8 +298,8 @@
 #stop .ic{width:12px;height:12px}
 #stop:disabled{display:none}
 .sbrow{display:flex;align-items:center;gap:8px}
-#count{font-size:12px;color:var(--muted);flex:1;min-width:0;white-space:nowrap}
-#kind{width:112px;flex:none;font-size:12.5px;border:1px solid color-mix(in srgb,var(--text) 30%,transparent);border-radius:6px;background:transparent;color:var(--text);padding:6px}
+#count{font-size:12px;color:var(--muted);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#kind{width:112px;flex:none;font-size:12.5px;border:1px solid color-mix(in srgb,var(--text) 30%,transparent);border-radius:6px;background:transparent;color:var(--text);padding:6px 2px}
 #kind option{background:var(--surface)}
 #export{border:0;background:var(--pri);color:var(--onpri);border-radius:999px;padding:9px 16px;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 #export:hover{filter:brightness(1.06)}

@@ -80,7 +80,7 @@ form{position:fixed;bottom:28px;left:calc(260px + (100vw - 260px - 768px) / 2);w
     check(narrow && small.x >= smallForm.x + smallForm.width && small.x + small.width <= 1285, `in a narrower window the buttons stay right of the input box, as icons (${JSON.stringify(small)})`);
     await page.screenshot({path:path.join(out, '1b-buttons-narrow.png')});
     await page.setViewport({width:1440, height:900});await sleep(1000);
-    // 导出 ▾ menu, then 导出 with the sidebar closed (all messages, the default 完整归档).
+    // 导出 ▾ menu, then 导出 with the sidebar closed (all messages, the default Markdown 压缩包).
     await (await inShadow('fast-text-dock', '[data-menu="mExport"]')).click();await sleep(200);
     await page.screenshot({path:path.join(out, '2-export-menu.png')});
     await page.keyboard.press('Escape');
@@ -156,7 +156,7 @@ form{position:fixed;bottom:28px;left:calc(260px + (100vw - 260px - 768px) / 2);w
     await popup.screenshot({path:path.join(out, '10-popup-open-group.png'), fullPage:true});
     await popup.click('#export');
     files = await waitDownload(3);
-    // The sidebar made 仅文字 the default, which the toolbar panel's button follows.
+    // The sidebar made Markdown 纯文字 the default, which the toolbar panel's button follows.
     check(files.length === 3 && files.includes(`${title} - ${today} (1).md`), `导出 in the toolbar panel downloads in the default format (${files.join(', ')})`);
     await popup.close().catch(() => {});
     // Obsidian as the export kind: 导出 becomes the pill 保存到 Obsidian | 打开 beside the input box, in
@@ -189,7 +189,7 @@ form{position:fixed;bottom:28px;left:calc(260px + (100vw - 260px - 768px) / 2);w
     // No 「当前对话」 label; the kind list at the end of the info line switches the default kind.
     check(await obsPopup.evaluate(() => !document.querySelector('#hero .xk') && document.getElementById('kindSel').value === 'obsidian'), 'the toolbar panel has no 当前对话 label and its kind list shows Obsidian');
     await obsPopup.select('#kindSel', 'md');await sleep(200);
-    check(await obsPopup.evaluate(() => document.getElementById('export').textContent === '导出仅文字' && !document.getElementById('obsOpen')), 'picking 仅文字 there turns the pill back into 导出仅文字');
+    check(await obsPopup.evaluate(() => document.getElementById('export').textContent === '导出 Markdown 纯文字' && !document.getElementById('obsOpen')), 'picking 仅文字 there turns the pill back into 导出仅文字');
     await obsPopup.screenshot({path:path.join(out, '14b-popup-kind-md.png')});
     await obsPopup.select('#kindSel', 'obsidian');await sleep(200);
     // 每次导出时选择保存位置 does not apply to Obsidian: greyed out, and it says why.
