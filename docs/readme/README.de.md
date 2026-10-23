@@ -59,8 +59,8 @@ Diese Erweiterung liest das Gespräch so, wie die ChatGPT-Seite es tut, und schr
 
 | Format | Datei | Gut für |
 | --- | --- | --- |
-| **Nur Text** | `.md` | Notiz-Apps, schnelle Kopien. Markdown mit Tabellen, Code, Formeln und Quellenlinks. |
-| **Gesamtarchiv** | `.zip` | Alles behalten: Markdown plus Originalbilder, Kartenbilder, angehängte und erzeugte Dateien. |
+| **Markdown nur Text** | `.md` | Notiz-Apps, schnelle Kopien. Markdown mit Tabellen, Code, Formeln und Quellenlinks. |
+| **Markdown-Paket** | `.zip` | Alles behalten: Markdown plus Originalbilder, Kartenbilder, angehängte und erzeugte Dateien. |
 | **HTML-Seite** | `.html` (oder `.html.zip`) | Lesen und teilen. Sieht aus wie ChatGPT, und die Karten sind interaktiv. |
 | **PDF (Drucken)** | über den Druckdialog | Drucken und abgeben. Echter Text zum Markieren und Durchsuchen, A4-Layout. |
 | **Obsidian** | eine Notiz in deinem Vault | Speichert in einen Ordner deiner Wahl und öffnet die Notiz. |
@@ -197,7 +197,7 @@ Noch nicht: nur die Antwort, die gerade auf der Seite steht. Karten werden in ih
 <details>
 <summary><b>In meiner Markdown-App fehlen die Bilder.</b></summary>
 
-Lass `conversation.md` neben seinem Ordner `assets/`; die Bilder sind relativ verlinkt. Nimm **Gesamtarchiv (.zip)**, um die Bilder zu bekommen; **Nur Text** schreibt nur das Markdown.
+Lass `conversation.md` neben seinem Ordner `assets/`; die Bilder sind relativ verlinkt. Nimm **Markdown-Paket (.zip)**, um die Bilder zu bekommen; **Markdown nur Text** schreibt nur das Markdown.
 </details>
 
 <details>

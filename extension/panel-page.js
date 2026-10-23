@@ -67,8 +67,9 @@
     // The chat's title, then what it holds and, at the end of that line, the export kind (the same
     // default as 导出 ▾ beside the input box and 默认导出 in the settings).
     hero.innerHTML=`<div class="xt" id="chatTitle"></div><div class="xm row"><span class="${summary&&!summary.ok?'bad':''}" id="chatMeta">${big?`<button class="warnlink" id="useFolder" type="button"></button>`:''}</span><select class="ksel" id="kindSel" aria-label="${esc(t('panel.kindLabel'))}" title="${esc(t('panel.kindTip'))}">${UI.kindOptions.map(([v])=>`<option value="${v}">${esc(S.kinds[v].name)}</option>`).join('')}</select></div><div class="xbtns">${k==='obsidian'
-      // Obsidian: the pill 保存到 Obsidian | 打开 (打开: the note last saved from this chat).
-      ?`<span class="opill two"><button class="xb pri" id="export" type="button">${icon('gem')}${esc(S.kinds[k].verb)}</button><button class="oopen" id="obsOpen" type="button" ${summary?.obsidianNote?'':'disabled'} title="${esc(summary?.obsidianNote?t('side.obsOpenTip'):t('panel.obsOpenFirst'))}">${icon('ext')}${esc(t('side.obsOpen'))}</button></span>`
+      // Obsidian: the pill ◆ 保存 | 打开, as in the sidebar and beside the input box (保存到 Obsidian in
+      // the tooltip; 打开: the note last saved from this chat). The full words do not fit beside 选择消息….
+      ?`<span class="opill two"><button class="xb pri" id="export" type="button" title="${esc(S.kinds[k].verb)}">${icon('gem')}${esc(t('side.save'))}</button><button class="oopen" id="obsOpen" type="button" ${summary?.obsidianNote?'':'disabled'} title="${esc(summary?.obsidianNote?t('side.obsOpenTip'):t('panel.obsOpenFirst'))}">${icon('ext')}${esc(t('side.obsOpen'))}</button></span>`
       :`<button class="xb pri" id="export" type="button">${icon(UI.kindIcon[k])}${esc(S.kinds[k].verb)}</button>`}<button class="xb ghost" id="pick" type="button">${esc(t('panel.pick'))}</button></div>`;
     $('obsOpen')?.addEventListener('click',async()=>{try{await call({type:'panel:obsidianOpen'});window.close();}catch(e){say(e.message,true);}});
     $('chatTitle').textContent=summary?.title||tab.title||'ChatGPT';
@@ -109,6 +110,7 @@ body[data-page=popup]{width:360px}
 .ksel{flex:none;font:inherit;font-size:12px;font-weight:500;color:var(--pri-deep);background:color-mix(in srgb,var(--pri) 12%,var(--surface));border:0;border-radius:999px;padding:4px 8px;cursor:pointer}
 .ksel option{background:var(--surface);color:var(--text)}
 .xbtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.xbtns .opill{min-width:fit-content}
 .xsec{margin-top:6px}
 .xft{display:flex;align-items:center;gap:14px;padding:12px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);margin-top:10px}
 .xft a{display:inline-flex;gap:4px;align-items:center;cursor:pointer;text-decoration:none;color:inherit}

@@ -59,8 +59,8 @@ ChatGPT 的回答早就不只是文字了：表格、公式、生成的圖片、
 
 | 格式 | 檔案 | 適合 |
 | --- | --- | --- |
-| **僅文字** | `.md` | 筆記軟體、快速複製。帶表格、程式碼、公式和來源連結的 Markdown。 |
-| **完整封存** | `.zip` | 什麼都留著：Markdown 加原圖、卡片圖、上傳的和生成的檔案。 |
+| **Markdown 純文字** | `.md` | 筆記軟體、快速複製。帶表格、程式碼、公式和來源連結的 Markdown。 |
+| **Markdown 壓縮檔** | `.zip` | 什麼都留著：Markdown 加原圖、卡片圖、上傳的和生成的檔案。 |
 | **HTML 網頁** | `.html`（或 `.html.zip`） | 閱讀和分享。外觀接近 ChatGPT，卡片可以操作。 |
 | **PDF（列印）** | 透過列印對話框 | 列印、繳交。文字能選取、能搜尋，A4 排版。 |
 | **Obsidian** | 你筆記庫裡的一篇筆記 | 存進你選的資料夾，並開啟這篇筆記。 |
@@ -197,7 +197,7 @@ Chrome 只在第一次安裝擴充功能時指派建議的 <kbd>Alt</kbd>+<kbd>S
 <details>
 <summary><b>在 Markdown 軟體裡看不到圖片。</b></summary>
 
-讓 `conversation.md` 和它的 `assets/` 資料夾放在一起，圖片用的是相對路徑。要圖片請用**完整封存（.zip）**；**僅文字**只寫 Markdown。
+讓 `conversation.md` 和它的 `assets/` 資料夾放在一起，圖片用的是相對路徑。要圖片請用 **Markdown 壓縮檔（.zip）**；**Markdown 純文字**只寫 Markdown。
 </details>
 
 <details>

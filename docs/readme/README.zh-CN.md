@@ -59,8 +59,8 @@ ChatGPT 的回答早就不只是文字了：表格、公式、生成的图片、
 
 | 格式 | 文件 | 适合 |
 | --- | --- | --- |
-| **仅文字** | `.md` | 笔记软件、快速复制。带表格、代码、公式和来源链接的 Markdown。 |
-| **完整归档** | `.zip` | 什么都留着：Markdown 加原图、卡片图、上传的和生成的文件。 |
+| **Markdown 纯文字** | `.md` | 笔记软件、快速复制。带表格、代码、公式和来源链接的 Markdown。 |
+| **Markdown 压缩包** | `.zip` | 什么都留着：Markdown 加原图、卡片图、上传的和生成的文件。 |
 | **HTML 网页** | `.html`（或 `.html.zip`） | 阅读和分享。外观接近 ChatGPT，卡片可以操作。 |
 | **PDF（打印）** | 通过打印对话框 | 打印、提交。文字能选中、能搜索，A4 排版。 |
 | **Obsidian** | 你笔记库里的一篇笔记 | 存进你选的文件夹，并打开这篇笔记。 |
@@ -197,7 +197,7 @@ Chrome 只在第一次安装扩展时分配建议的 <kbd>Alt</kbd>+<kbd>Shift</
 <details>
 <summary><b>在 Markdown 软件里看不到图片。</b></summary>
 
-让 `conversation.md` 和它的 `assets/` 文件夹放在一起，图片用的是相对路径。要图片请用**完整归档（.zip）**；**仅文字**只写 Markdown。
+让 `conversation.md` 和它的 `assets/` 文件夹放在一起，图片用的是相对路径。要图片请用 **Markdown 压缩包（.zip）**；**Markdown 纯文字**只写 Markdown。
 </details>
 
 <details>

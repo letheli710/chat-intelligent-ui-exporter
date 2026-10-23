@@ -57,8 +57,8 @@ This extension reads the conversation the way the ChatGPT page does and writes i
 
 | Format | File | Best for |
 | --- | --- | --- |
-| **Text only** | `.md` | Notes apps, quick copies. Markdown with tables, code, formulas and source links. |
-| **Full archive** | `.zip` | Keeping everything: Markdown plus original images, card pictures, attached and generated files. |
+| **Markdown text only** | `.md` | Notes apps, quick copies. Markdown with tables, code, formulas and source links. |
+| **Markdown package** | `.zip` | Keeping everything: Markdown plus original images, card pictures, attached and generated files. |
 | **HTML page** | `.html` (or `.html.zip`) | Reading and sharing. Looks like ChatGPT, and the cards are interactive. |
 | **PDF (print)** | via the print dialog | Printing and handing in. Real text you can select and search, A4 layout. |
 | **Obsidian** | a note in your vault | Saves into a folder you pick and opens the note. |
@@ -195,7 +195,7 @@ Not yet: only the answer currently shown on the page. Cards are exported in thei
 <details>
 <summary><b>The images are missing in my Markdown app.</b></summary>
 
-Keep `conversation.md` next to its `assets/` folder; the images are linked relatively. Use **Full archive (.zip)** to get the images; **Text only** writes just the Markdown.
+Keep `conversation.md` next to its `assets/` folder; the images are linked relatively. Use **Markdown package (.zip)** to get the images; **Markdown text only** writes just the Markdown.
 </details>
 
 <details>

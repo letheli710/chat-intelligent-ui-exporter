@@ -4,8 +4,8 @@
 
 Every format is made on your computer from the conversation as ChatGPT's website returns it. The extension does not scroll the page or take screenshots of it, and calls no AI service.
 
-- [Text only (.md)](#text-only)
-- [Full archive (.zip)](#full-archive)
+- [Markdown text only (.md)](#markdown-text-only)
+- [Markdown package (.zip)](#markdown-package)
 - [Intelligent UI cards](#intelligent-ui-cards)
 - [HTML page](#html-page)
 - [PDF (print)](#pdf)
@@ -13,7 +13,7 @@ Every format is made on your computer from the conversation as ChatGPT's website
 - [Generic or Obsidian Markdown](#generic-or-obsidian-markdown)
 - [Not supported yet](#not-supported-yet)
 
-## Text only
+## Markdown text only
 
 The answer text as editable Markdown, with tables, code blocks, formulas and source links.
 
@@ -23,7 +23,7 @@ The answer text as editable Markdown, with tables, code blocks, formulas and sou
 - Text on cards is written as it is: `*`, `` ` ``, `<`, `&`, `#` and `$` are escaped so they do not turn into bold, code, HTML, tags or formulas.
 - With **Obsidian properties** on (the default), the file starts with YAML: title, source, time and model.
 
-## Full archive
+## Markdown package
 
 The Markdown plus every file it refers to. Keep `conversation.md` next to `assets/`, or the images will not show.
 
@@ -74,7 +74,7 @@ When the selected messages carry more than 10 pictures and files, the line under
 
 **PDF (print)** lays the chat out and opens the print dialog right on the ChatGPT page; choose **Save as PDF**. The PDF is a still copy of what the chat shows when opened.
 
-- **Real text**: built from text and layout, not stitched screenshots, so you can select, search and click links. It contains what the full archive does (text, original images, card pictures, app previews, map pictures), on A4 pages. No page reading, no network, no AI.
+- **Real text**: built from text and layout, not stitched screenshots, so you can select, search and click links. It contains what the Markdown package does (text, original images, card pictures, app previews, map pictures), on A4 pages. No page reading, no network, no AI.
 - **Cards** are drawn in their default state. A card taller than a page is cut at a blank line and continues on the next. Image-and-text list cards become a list with the picture on the left and selectable text on the right. The card's text sits invisibly behind its picture, in reading order, so search and copy still find it.
 - **Collapsed blocks are open**: card text, original-image lists, other card states.
 - **Left out**, as on the ChatGPT page: the thinking process, and the code the interpreter ran with its intermediate output. Generated charts and files stay in the text (files by name).

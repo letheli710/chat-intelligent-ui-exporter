@@ -59,8 +59,8 @@ Cette extension lit la conversation comme le fait la page ChatGPT, puis l’enre
 
 | Format | Fichier | Idéal pour |
 | --- | --- | --- |
-| **Texte seul** | `.md` | Applis de notes, copies rapides. Du Markdown avec tableaux, code, formules et liens vers les sources. |
-| **Archive complète** | `.zip` | Tout garder : le Markdown plus les images d’origine, les images des cartes, les fichiers joints et générés. |
+| **Markdown texte seul** | `.md` | Applis de notes, copies rapides. Du Markdown avec tableaux, code, formules et liens vers les sources. |
+| **Paquet Markdown** | `.zip` | Tout garder : le Markdown plus les images d’origine, les images des cartes, les fichiers joints et générés. |
 | **Page HTML** | `.html` (ou `.html.zip`) | Lire et partager. Ressemble à ChatGPT, et les cartes sont interactives. |
 | **PDF (impression)** | via la boîte de dialogue d’impression | Imprimer et rendre. Du vrai texte, sélectionnable et consultable, mis en page en A4. |
 | **Obsidian** | une note dans votre coffre | Enregistre dans le dossier choisi et ouvre la note. |
@@ -197,7 +197,7 @@ Pas encore : seule la réponse affichée sur la page l’est. Les cartes sont ex
 <details>
 <summary><b>Les images manquent dans mon appli Markdown.</b></summary>
 
-Gardez `conversation.md` à côté de son dossier `assets/` ; les images sont liées en chemins relatifs. Utilisez **Archive complète (.zip)** pour avoir les images ; **Texte seul** n’écrit que le Markdown.
+Gardez `conversation.md` à côté de son dossier `assets/` ; les images sont liées en chemins relatifs. Utilisez **Paquet Markdown (.zip)** pour avoir les images ; **Markdown texte seul** n’écrit que le Markdown.
 </details>
 
 <details>

@@ -59,8 +59,8 @@ Esta extensão lê a conversa do mesmo jeito que a página do ChatGPT e grava tu
 
 | Formato | Arquivo | Melhor para |
 | --- | --- | --- |
-| **Só texto** | `.md` | Apps de notas e cópias rápidas. Markdown com tabelas, código, fórmulas e links de fontes. |
-| **Arquivo completo** | `.zip` | Guardar tudo: Markdown mais imagens originais, imagens dos cards e arquivos anexados ou gerados. |
+| **Markdown só texto** | `.md` | Apps de notas e cópias rápidas. Markdown com tabelas, código, fórmulas e links de fontes. |
+| **Pacote Markdown** | `.zip` | Guardar tudo: Markdown mais imagens originais, imagens dos cards e arquivos anexados ou gerados. |
 | **Página HTML** | `.html` (ou `.html.zip`) | Ler e compartilhar. Parece o ChatGPT, e os cards são interativos. |
 | **PDF (imprimir)** | pela caixa de impressão | Imprimir e entregar. Texto de verdade, que dá para selecionar e pesquisar, em A4. |
 | **Obsidian** | uma nota no seu cofre | Salva na pasta que você escolher e abre a nota. |
@@ -197,7 +197,7 @@ Ainda não: só a resposta mostrada na página. Os cards são exportados no esta
 <details>
 <summary><b>As imagens não aparecem no meu app de Markdown.</b></summary>
 
-Deixe `conversation.md` ao lado da pasta `assets/`; as imagens usam caminhos relativos. Use **Arquivo completo (.zip)** para ter as imagens; **Só texto** grava só o Markdown.
+Deixe `conversation.md` ao lado da pasta `assets/`; as imagens usam caminhos relativos. Use **Pacote Markdown (.zip)** para ter as imagens; **Markdown só texto** grava só o Markdown.
 </details>
 
 <details>
