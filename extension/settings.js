@@ -5,7 +5,7 @@
 // localStorage holds them, the five older options under the keys they always had.
 (root => {
   const I18n=root.ChatExportI18n||(typeof module!=='undefined'?require('./i18n.js'):null),t=I18n.t;
-  const version='0.11.43';
+  const version='0.11.44';
   const defaults={
     saveAs:false,
     exportKind:'zip', profile:'generic', htmlForm:'single', htmlMap:true, autoClose:false,
@@ -120,9 +120,11 @@
   const pad=n=>String(n).padStart(2,'0');
   const day=(d=new Date())=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   const cleanPart=s=>String(s??'').replace(/\s+/g,' ').trim().replace(/[<>:"/\\|?*\x00-\x1f]/g,'_');
+  // Cut by characters, not UTF-16 units: half an emoji makes Chrome save replacement marks in the name.
+  const cut=(s,n)=>[...s].slice(0,n).join('');
   // A title can end in a newline or spaces ("化工工艺教学 \n"); Windows also drops trailing dots.
   function fileBase(values,{title,date=new Date()}){
-    const t=cleanPart(title).slice(0,90).replace(/[ .]+$/,'')||'ChatGPT',d=day(date),p=cleanPart(values.filePrefix).slice(0,40).replace(/[ .]+$/,'')||'ChatGPT';
+    const t=cut(cleanPart(title),90).replace(/[ .]+$/,'')||'ChatGPT',d=day(date),p=cut(cleanPart(values.filePrefix),40).replace(/[ .]+$/,'')||'ChatGPT';
     const base={title:t,'title-date':`${t} - ${d}`,'date-title':`${d} - ${t}`,prefix:`${p} - ${t}`}[values.fileName]||`${t} - ${d}`;
     return values.fileVersion?`${base} - v${version}`:base;
   }

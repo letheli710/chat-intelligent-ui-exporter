@@ -1,5 +1,5 @@
 (function mount(again={}){
-  const version='0.11.43';
+  const version='0.11.44';
   // On chatgpt.com the manifest keeps this script in every tab (resident.js says so): the two
   // buttons beside the input box are always there and open the sidebar. Injected by hand (tests,
   // the live bundle) the sidebar opens at once, and injecting it again shows or hides it.
@@ -221,7 +221,10 @@
   // A card can name files only in its data ({url:"sandbox:/mnt/data/…"}), with no link in the text.
   // In the source the same path also sits in Markdown links, "(sandbox:/mnt/data/a.csv)": an
   // unmatched ")" ends the path, while "report (1).csv" keeps its own parentheses.
-  const cardSandboxPaths=m=>m.dil?[...new Set([...`${m.dilSource||''}\n${JSON.stringify(m.dil.constants||{})}`.matchAll(/sandbox:(\/mnt\/data\/(?:[^"'`\n\\()\]<>]|\([^()"'`\n\\]*\))+)/g)].map(x=>x[1].trim()))]:[];
+  // A path built in the card's code ("图表%20${i}.png") names no file of its own.
+  const cardSandboxPaths=m=>m.dil?[...new Set([...`${m.dilSource||''}\n${JSON.stringify(m.dil.constants||{})}`.matchAll(/sandbox:(\/mnt\/data\/(?:[^"'`\n\\()\]<>]|\([^()"'`\n\\]*\))+)/g)].map(x=>x[1].trim()))].filter(p=>!p.includes('${')):[];
+  // Card paths keep the card's URL encoding ("all%20files.zip"); links in the text are decoded.
+  const decodedPath=p=>{try{return decodeURIComponent(p);}catch{return p;}};
   // The panel is injected from the files on disk at every click, but the background worker and
   // permissions only change when the extension is reloaded; a version mismatch means it was not.
   function staleNotice(){let loaded=null;try{loaded=chrome.runtime.getManifest?.().version;}catch{}return loaded&&loaded!==version?`\n⚠ ${t('status.stale',loaded,version)}`:'';}
@@ -255,7 +258,7 @@
     // Files the code interpreter wrote, linked as sandbox:/mnt/data/... in the answer.
     const linkedItems=conversationId?messages.flatMap(m=>[...new Set([...m.md.matchAll(sandboxLink)].map(x=>x[1]))].map(link=>({messageId:m.id,link,path:decodeURIComponent(link.slice(8))}))):[];
     const cardItems=conversationId?messages.filter(m=>m.dil).flatMap(m=>cardSandboxPaths(m)
-      .filter(path=>!linkedItems.some(x=>x.messageId===m.id&&x.path===path)).map(path=>({messageId:m.id,path,card:true}))):[];
+      .filter(path=>!linkedItems.some(x=>x.messageId===m.id&&x.path===decodedPath(path))).map(path=>({messageId:m.id,path,name:decodedPath(path).split('/').pop(),card:true}))):[];
     const sandboxItems=[...linkedItems,...cardItems];
     const attachmentIds=messages.flatMap(m=>[...(m.attachments||[]),...(m.tables||[])].map(a=>a.fileId));
     const [files,uiData,codeFiles,attached]=await Promise.all([
@@ -287,7 +290,7 @@
       if(f.blob)assets.push({path:f.localPath,blob:f.blob,messageId:f.messageId,kind:'code-file'});else warnings.push(`${f.messageId}: ${t(item.card?'warn.cardCodeFileFailed':'warn.codeFileFailed',f.path,f.error)}`);
       if(!f.blob)continue;
       if(!item.card){m.md=m.md.split(`](${item.link})`).join(`](${f.localPath})`);continue;}
-      const name=(f.path.split('/').pop()||'file').replace(/[\\`*_[\]<&#$]/g,'\\$&');
+      const name=(item.name||f.path.split('/').pop()||'file').replace(/[\\`*_[\]<&#$]/g,'\\$&');
       cardLinks.set(m,[...(cardLinks.get(m)||[]),`- [${name}](${f.localPath})`]);}
     for(const [m,links] of cardLinks)m.md+=`\n\n**${t('md.codeFiles')}**\n\n${links.join('\n')}`;
     const byId=new Map(files.map(f=>[f.fileId,f]));
