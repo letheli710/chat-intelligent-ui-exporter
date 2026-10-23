@@ -74,3 +74,40 @@ test('a chat that changed since it was read is read again at export, and the sta
  assert.equal(reads,2,'read again by itself');assert.match(s.getElementById('status').textContent,/已读取 2 条正文/);
  dom.window.close();
 });
+// ChatGPT's page since 2026-10: no data-message-id, ids in data-chatgpt-search-message-ids, a bare "Stop" button, turn state attributes.
+test('on the 2026-10 page a new answer is still noticed, and exporting while ChatGPT answers is refused',async()=>{
+ const dom=new JSDOM('<div data-talvt-turn-state="complete"><div data-chatgpt-search-message-ids="b b">Visible answer</div></div><form data-chatgpt-composer=""></form>',{url:'https://chatgpt.com/c/chat',runScripts:'outside-only'}),w=dom.window;let reads=0;
+ const data={title:'Test',current_node:'b',mapping:{a:{parent:null,children:['b'],message:{id:'a',author:{role:'user'},content:{parts:['Question']}}},b:{parent:'a',children:[],message:{id:'b',author:{role:'assistant'},content:{parts:['Visible answer']}}}}};
+ w.fetch=async path=>{if(path!=='/api/auth/session')reads++;return {ok:true,json:async()=>path==='/api/auth/session'?{accessToken:'test'}:data};};
+ w.chrome={runtime:{sendMessage:async()=>({id:1})}};w.URL.createObjectURL=()=>'blob:https://chatgpt.com/t';w.URL.revokeObjectURL=()=>{};
+ for(const f of ['fast-text.js','settings.js','ui-kit.js','fast-content.js'])w.eval(fs.readFileSync(`extension/${f}`,'utf8'));
+ const s=w.document.querySelector('[data-archive-owned]').shadowRoot,ready=async()=>{for(let i=0;i<100&&s.getElementById('preview').disabled;i++)await new Promise(r=>setTimeout(r,5));};
+ await ready();assert.equal(reads,1);
+ const form=w.document.querySelector('form');
+ form.insertAdjacentHTML('beforeend','<button type="button" aria-label="Stop"></button>');
+ s.getElementById('kind').value='md';s.getElementById('export').click();await new Promise(r=>setTimeout(r,30));await ready();
+ assert.match(s.getElementById('status').textContent,/还在回答/,'stop button in the composer');
+ form.replaceChildren();w.document.body.insertAdjacentHTML('beforeend','<div data-talvt-turn-state="in_progress"><div data-chatgpt-search-message-ids="c">New answer</div></div>');
+ s.getElementById('export').click();await new Promise(r=>setTimeout(r,30));await ready();
+ assert.match(s.getElementById('status').textContent,/还在回答/,'turn still being written');
+ w.document.querySelector('[data-talvt-turn-state="in_progress"]').setAttribute('data-talvt-turn-state','complete');
+ const seen=[];new w.MutationObserver(()=>seen.push(s.getElementById('status').textContent)).observe(s.getElementById('status'),{childList:true,characterData:true,subtree:true});
+ s.getElementById('export').click();await new Promise(r=>setTimeout(r,30));await ready();
+ assert.ok(seen.some(t=>/对话有新内容，正在重新读取/.test(t)),seen.join(' | '));
+ assert.equal(reads,2,'read again by itself');
+ dom.window.close();
+});
+test('a chat opened while ChatGPT is answering is read by itself once the answer is finished',async()=>{
+ const dom=new JSDOM('<div data-talvt-turn-state="in_progress"><div data-chatgpt-search-message-ids="b">Visible answer</div></div><form data-chatgpt-composer=""><button type="button" aria-label="Stop"></button></form>',{url:'https://chatgpt.com/c/chat',runScripts:'outside-only'}),w=dom.window;let reads=0;
+ const data={title:'Test',current_node:'b',mapping:{a:{parent:null,children:['b'],message:{id:'a',author:{role:'user'},content:{parts:['Question']}}},b:{parent:'a',children:[],message:{id:'b',author:{role:'assistant'},content:{parts:['Visible answer']}}}}};
+ w.fetch=async path=>{if(path!=='/api/auth/session')reads++;return {ok:true,json:async()=>path==='/api/auth/session'?{accessToken:'test'}:data};};
+ w.chrome={runtime:{sendMessage:async()=>({id:1})}};
+ for(const f of ['fast-text.js','settings.js','ui-kit.js','fast-content.js'])w.eval(fs.readFileSync(`extension/${f}`,'utf8'));
+ const s=w.document.querySelector('[data-archive-owned]').shadowRoot;
+ await new Promise(r=>setTimeout(r,300));
+ assert.equal(reads,0);assert.match(s.getElementById('status').textContent,/还在回答/);
+ w.document.querySelector('form').replaceChildren();w.document.querySelector('[data-talvt-turn-state]').setAttribute('data-talvt-turn-state','complete');
+ for(let i=0;i<60&&!/已读取/.test(s.getElementById('status').textContent);i++)await new Promise(r=>setTimeout(r,50));
+ assert.equal(reads,1);assert.match(s.getElementById('status').textContent,/已读取 2 条正文/);
+ dom.window.close();
+});

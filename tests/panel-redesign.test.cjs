@@ -53,6 +53,9 @@ test('file names: title and date in the chosen order, a prefix, the version only
   assert.equal(Settings.fileBase({...v,fileName:'prefix',filePrefix:'课程/笔记'},{title,date}),'课程_笔记 - 化工工艺教学');
   assert.equal(Settings.fileBase({...v,fileVersion:true},{title:'a:b?',date}),`a_b_ - 2026-10-19 - v${Settings.version}`);
   assert.equal(Settings.fileBase(v,{title:'...',date}),'ChatGPT - 2026-10-19');
+  // A long title is cut by characters: an emoji at the cut is kept whole or left out, never halved.
+  const long=Settings.fileBase({...v,fileName:'title'},{title:'长'.repeat(89)+'🧪📚',date});
+  assert.equal(long,'长'.repeat(89)+'🧪');assert.ok(!/[\ud800-\udfff]/.test(long.replace(/[\ud800-\udbff][\udc00-\udfff]/g,'')));
 });
 
 test('Markdown settings: Obsidian properties with the model, timestamps and role names',()=>{

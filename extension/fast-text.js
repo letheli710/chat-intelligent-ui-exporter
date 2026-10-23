@@ -361,7 +361,8 @@
     const token = (await sessionResponse.json()).accessToken;
     if (!token) error(t('err.login'));
     const headers = {Authorization:`Bearer ${token}`}, names = new Set();
-    return pool(items, concurrency, async ({messageId, path}) => {
+    // An item can carry the file's readable name (a card's path is still URL-encoded).
+    return pool(items, concurrency, async ({messageId, path, name: given}) => {
       try {
         signal?.throwIfAborted();
         // Charts a card shows were already downloaded to draw the card.
@@ -375,7 +376,7 @@
           if (!file.ok) throw Error(t('err.downloadHttp', file.status));
           return file.blob();
         })();
-        let name = (path.split('/').pop() || 'file').replace(/[^\p{L}\p{N}_.\-]/gu, '_'), n = 1;
+        let name = (given || path.split('/').pop() || 'file').replace(/[^\p{L}\p{N}_.\-]/gu, '_'), n = 1;
         while (names.has(name)) name = name.replace(/(\.[^.]*)?$/, m => `-${++n}${m}`);
         names.add(name);
         return {messageId, path, blob, localPath:`files/${name}`};

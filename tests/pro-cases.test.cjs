@@ -24,6 +24,18 @@ test('a file a card links and also names in its data is downloaded once', async 
     assert.equal(r.requests.filter(p => p.includes('/interpreter/download?')).length, r.manifest.assets.filter(a => a.kind === 'code-file').length, n);
   }
 });
+test('a file with a space in its name, URL-encoded in the card and in the link, is saved once under its real name', async () => {
+  // As on 2026-10-23 (Z1 / Z3): "all%20files.zip" was saved twice, once as all_20files.zip, and a
+  // path the card builds in code ("图表%20${…}.png") was reported as a failed download.
+  const raw = JSON.parse(JSON.stringify(load('11')).split('/mnt/data/cleaned.csv').join('/mnt/data/cleaned%20data.csv')
+    .replace('\\"title\\":__dilConstants[\\"114\\"]', '\\"title\\":__dilConstants[\\"114\\"],\\"x\\":`sandbox:/mnt/data/图表%20${1}.png`'));
+  const r = await runExport(raw), files = [...r.files.keys()].filter(k => k.startsWith('files/'));
+  assert.ok(files.includes('files/cleaned_data.csv'), files.join());
+  assert.deepEqual(files.filter(f => /cleaned/.test(f)), ['files/cleaned_data.csv']);
+  assert.doesNotMatch(r.md, /cleaned%20data/);
+  assert.equal(r.requests.filter(p => p.includes('/interpreter/download?') && /cleaned/.test(decodeURIComponent(p))).length, 1);
+  assert.deepEqual(r.warnings.filter(w => w.includes('${')), []);
+});
 test('PRO-03: struck-out text in a redline keeps its strikethrough', async () => {
   const md = (await runExport(load('03'))).md;
   assert.match(md, /\| 2\.3 \| 每日按未付款项的 ~~1%~~ \*\*0\.03%\*\* 支付违约金/);
