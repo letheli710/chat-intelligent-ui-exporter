@@ -1,5 +1,5 @@
 (function mount(again={}){
-  const version='0.11.38';
+  const version='0.11.39';
   // On chatgpt.com the manifest keeps this script in every tab (resident.js says so): the two
   // buttons beside the input box are always there and open the sidebar. Injected by hand (tests,
   // the live bundle) the sidebar opens at once, and injecting it again shows or hides it.
