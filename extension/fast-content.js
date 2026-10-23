@@ -1,5 +1,5 @@
 (function mount(again={}){
-  const version='0.11.42';
+  const version='0.11.43';
   // On chatgpt.com the manifest keeps this script in every tab (resident.js says so): the two
   // buttons beside the input box are always there and open the sidebar. Injected by hand (tests,
   // the live bundle) the sidebar opens at once, and injecting it again shows or hides it.
@@ -34,14 +34,16 @@
   const htmlCards=()=>cfg().htmlCards,escapeProseHtml=()=>cfg().proseHtml==='escape';
   // A saved chat (/c/id) or a shared link (/share/id), which has its own read endpoint.
   const target=()=>{const share=location.pathname.match(/\/share\/([^/]+)/)?.[1];return share?{id:share,share:true}:{id:location.pathname.match(/\/c\/([^/]+)/)?.[1],share:false};};
-  const lastMessage=()=>[...document.querySelectorAll('[data-message-id]')].filter(n=>!n.closest('[hidden],[aria-hidden="true"]')).at(-1)?.getAttribute('data-message-id');
-  const streaming=()=>document.querySelector('[data-testid="stop-button"],button[aria-label="Stop streaming"],button[aria-label="Stop generating"],button[aria-label="停止生成"]');
+  // Since 2026-10 ChatGPT has no data-message-id: each turn lists its message ids in data-chatgpt-search-message-ids (last one is the newest).
+  const lastMessage=()=>{const n=[...document.querySelectorAll('[data-message-id],[data-chatgpt-search-message-ids]')].filter(n=>!n.closest('[hidden],[aria-hidden="true"]')).at(-1);return n?.getAttribute('data-message-id')||n?.getAttribute('data-chatgpt-search-message-ids')?.trim().split(/\s+/).at(-1);};
+  // The stop button is now a plain aria-label="Stop" in the composer; a turn being written is data-talvt-turn-state="in_progress" in every language.
+  const streaming=()=>document.querySelector('[data-testid="stop-button"],button[aria-label="Stop streaming"],button[aria-label="Stop generating"],button[aria-label="停止生成"],form[data-chatgpt-composer] button[aria-label="Stop"],[data-talvt-turn-state="in_progress"]');
   function busy(value){busyFlag=value;for(const id of ['reload','all','mine','answers','invert','none','preview','export','kind','raw','gear','gear2'])$(id).disabled=value;placeDock();if(!value&&host.hidden&&resident&&$('status').textContent)toast($('status').textContent);$('stop').disabled=!value;ui.querySelectorAll('#list input').forEach(n=>n.disabled=value);if(!value)relocalize();}
   function assertCurrent(){if(!state)throw Error(t('err.notRead'));if(state.url!==route())throw Error(t('err.switched'));if(streaming())throw Error(t('err.streaming'));const leaf=lastMessage();if(leaf&&state.leaf&&leaf!==state.leaf&&!state.messages.some(m=>m.id===leaf))throw Object.assign(Error(t('err.branchChanged')),{reread:true});controller?.signal.throwIfAborted();}
   function ids(){return [...ui.querySelectorAll('#list input:checked')].map(n=>n.dataset.messageId);}
   async function load(){controller?.abort();controller=new AbortController();const current=++generation,url=route(),leaf=lastMessage(),where=target();readRoute=url;state=null;obsidianState();busy(true);$('list').replaceChildren();$('output').hidden=true;$('status').textContent=t('status.reading');const start=performance.now(),sandbox=startSandbox();try{
     if(!where.id)throw Error(t('err.openChat'));
-    if(streaming())throw Error(t('err.streaming'));
+    if(streaming()){readRoute=null;throw Error(t('err.streaming'));}// read again once the answer is finished
     const data=await api.loadConversation({...where,leafId:leaf,fetch:window.fetch.bind(window),signal:controller.signal,onProgress:p=>$('status').textContent=t('status.readingHistory',p.messages)});
     if(current!==generation||url!==route())throw Error(t('err.switchedWhileReading'));
     state={...data,url,leaf,conversationId:where.share?data.conversationId:where.id,timings:{readMs:performance.now()-start}};
