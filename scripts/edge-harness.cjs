@@ -21,7 +21,7 @@ async function runExport(raw, {locale, ...options} = {}) {
   const before = env.locale;if (locale) env.use(locale);
   try {return await exportIn(raw, options);} finally {env.use(before);}
 }
-async function exportIn(raw, {respond, storage = {}, searchImages = false, html = null, maps = true, mode = 'zip', snapshot, appPreview, message} = {}) {
+async function exportIn(raw, {respond, storage = {}, fault, searchImages = false, html = null, maps = true, mode = 'zip', snapshot, appPreview, message} = {}) {
   const id = raw.conversation_id || 'chat';
   const dom = new JSDOM('<div></div>', {url:`https://chatgpt.com/c/${id}`, runScripts:'outside-only'}), w = dom.window;
   // ChatGPT titles the tab after the chat.
@@ -69,6 +69,8 @@ async function exportIn(raw, {respond, storage = {}, searchImages = false, html 
   w.addEventListener('error', e => errors.push('window error: ' + e.message));
   // Panel settings (e.g. chatExportHtmlCards) as the page's localStorage holds them.
   for (const [k, v] of Object.entries(storage)) w.localStorage.setItem(k, v);
+  // fault: force a card fallback ('list', 'image', 'thumb', 'table', 'html' or 'png').
+  if (fault) w.chatExportFault = fault;
   // The HTML form and the map choice, as the settings hold them.
   if (html) {w.localStorage.setItem('chatExportHtmlForm', html);w.localStorage.setItem('chatExportHtmlMap', maps ? '1' : '0');}
   w.ChatExportDilRender = render;

@@ -160,8 +160,8 @@ test('panel: a picture-list card becomes a table of thumbnails and text; every f
   for(const c of cases){
     const dom=new JSDOM('<div></div>',{url:'https://chatgpt.com/c/6ad0d397-0000-83e9-a872-c74862120096',runScripts:'outside-only'}),w=dom.window;const files=[];
     if(c.html)w.localStorage.setItem('chatExportHtmlCards','1');
-    if(c.fault)w.localStorage.setItem('chatExportFault',c.fault);
-    if(c.fault==='png')w.localStorage.setItem('chatExportFault','table'),c.both=true;
+    if(c.fault)w.chatExportFault=c.fault;
+    if(c.fault==='png')w.chatExportFault='table',c.both=true;
     w.fetch=async path=>{if(path.startsWith('https://cdn.example/'))return !c.missing||path.endsWith('a.jpg')?{ok:true,blob:async()=>new w.Blob(['jpeg'],{type:'image/jpeg'})}:{ok:false,status:404};return path==='/api/auth/session'?{ok:true,json:async()=>({accessToken:'t'})}:{ok:true,json:async()=>chat};};
     let decodes=0;w.createImageBitmap=async()=>{if(c.decode&&++decodes>2)throw Error('The source image could not be decoded.');return {width:800,height:600,close(){}};};
     w.OffscreenCanvas=class{getContext(){return {drawImage(){}};}async convertToBlob(){return new w.Blob(['small'],{type:'image/jpeg'});}};

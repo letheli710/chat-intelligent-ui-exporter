@@ -45,7 +45,7 @@ Most regression tests read real test conversations captured on chatgpt.com (`tes
 | `node scripts/html-check.cjs [--out dir] [name]` | HTML export of every fixture, both forms: every Markdown line is on the page, every referenced file exists, every card runs and changes when used, every embedded app has a frame, both forms match. |
 | `npm run pdf-check` | Exports every fixture as PDF in headless Chrome and reads it back with pdf.js: text, images, uncut cards, links, embedded fonts, page count, no blank pages. `--shots` saves page images. |
 | `npm run panel-check` | Loads the extension into a real Chrome on a stand-in chatgpt.com and goes through the buttons, sidebar, toolbar panel, settings, Obsidian saving and the large-file suggestion. |
-| `node scripts/markdown-same.cjs` | Markdown export of every fixture compared with `main`. |
+| `node scripts/markdown-same.cjs [ref]` | Markdown export of every fixture compared with `main` (or another branch or tag). Needs `tests/fixtures/`. |
 
 `pdf-check`, `panel-check` and the screenshots need a local Chrome (or set `CHROME_PATH`).
 
@@ -62,7 +62,7 @@ Retake them when the interface changes.
 
 ## Trying fallbacks on a real page
 
-To see how a card falls back, run `localStorage.chatExportFault='thumb'` in the ChatGPT tab's console (also `list`, `image`, `table`, `png`, `html`), export, then `localStorage.removeItem('chatExportFault')`.
+To see how a card falls back, open DevTools in the ChatGPT tab, switch the console's context (the dropdown above it) to this extension, run `chatExportFault='thumb'` (also `list`, `image`, `table`, `png`, `html`), export, then `delete chatExportFault`. The page's own scripts and `localStorage` cannot turn it on. The tests pass `fault` to `scripts/edge-harness.cjs`.
 
 ## Running the current code on chatgpt.com
 
