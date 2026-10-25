@@ -97,7 +97,7 @@ test('a strikethrough, as a node or a lineThrough style, becomes <del> in both l
 });
 
 test('the fault switch "html" shows the table fallback on a real page', async () => {
-  const r = await exportCard([{body:'x'}, {body:'y'}], {chatExportHtmlCards:'1', chatExportFault:'html'});
+  const r = await runExport(rawCard([{body:'x'}, {body:'y'}]), {storage:{chatExportHtmlCards:'1'}, fault:'html'});
   assert.equal(r.manifest.cards[0].layout, 'table');
   assert.equal(r.manifest.cards[0].fallback, 'HTML 未通过校验，改用表格：测试：HTML 校验失败');
   assert.equal(r.files.has('assets/card-m-1-pic2.jpg'), true, 'the table uses the same thumbnails');

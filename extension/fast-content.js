@@ -1,5 +1,5 @@
 (function mount(again={}){
-  const version='1.0.0';
+  const version='1.0.1';
   // On chatgpt.com the manifest keeps this script in every tab (resident.js says so): the two
   // buttons beside the input box are always there and open the sidebar. Injected by hand (tests,
   // the live bundle) the sidebar opens at once, and injecting it again shows or hides it.
@@ -192,9 +192,9 @@
     const bitmap=await createImageBitmap(blob),k=Math.max(width/bitmap.width,height/bitmap.height),w=bitmap.width*k,h=bitmap.height*k;
     const canvas=new OffscreenCanvas(width,height);canvas.getContext('2d').drawImage(bitmap,(width-w)/2,(height-h)/2,w,h);bitmap.close?.();
     return canvas.convertToBlob({type:'image/jpeg',quality:.85});}
-  // Fault switch for checking the fallbacks on a real page: in the ChatGPT tab's console run
-  // localStorage.chatExportFault='list'|'image'|'thumb'|'table'|'html'|'png', export, then removeItem.
-  const fault=stage=>{try{return localStorage.getItem('chatExportFault')===stage;}catch{return false;}};
+  // Fault switch for the tests: chatExportFault='list'|'image'|'thumb'|'table'|'html'|'png' on this
+  // script's own global. The page cannot reach it; on a real page set it from the extension's console context.
+  const fault=stage=>globalThis.chatExportFault===stage;
   // loose: the wider recognition (image in its own box, list in a col) used only with the HTML option.
   const pictureListOf=(tree,loose=false)=>{try{if(fault('list'))throw Error('fault');return dilRender.pictureList?.(tree,{loose})||null;}catch{return null;}};
   // Each card becomes an image, with its text folded underneath (searchable, not duplicated on screen).
