@@ -98,7 +98,7 @@
         renderer:t => math(t.text, !!t.display)}
     ], renderer:{
       heading({tokens, depth}) {const n = Math.min(6, depth + 2);return `<h${n}>${this.parser.parseInline(tokens)}</h${n}>\n`;},
-      code({text, lang}) {const language = String(lang || '').trim().split(/\s/)[0];return `<div class="codeblock"><div class="code-head"><span>${escapeHtml(language || t('html.code'))}</span><button type="button" class="copy">${escapeHtml(t('html.copy'))}</button></div><pre><code${language ? ` class="language-${escapeHtml(language)}"` : ''}>${escapeHtml(text.replace(/\n$/, ''))}</code></pre></div>\n`;},
+      code({text, lang}) {const language = String(lang || '').trim().split(/\s/)[0];return `<div class="codeblock"><div class="code-head"><span>${escapeHtml(language || t('html.code'))}</span>${slot({copy:1})}</div><pre><code${language ? ` class="language-${escapeHtml(language)}"` : ''}>${escapeHtml(text.replace(/\n$/, ''))}</code></pre></div>\n`;},
       table(token) {return `<div class="table-wrap">${lib.Renderer.prototype.table.call(this, token)}</div>\n`;},
       html({text}) {return text;},
       paragraph({tokens}) {
@@ -377,6 +377,8 @@ footer.notes{margin-top:48px;border-top:1px solid var(--border);padding-top:16px
       const toHtml = markdownRenderer(ctx);
       let md = String(item.md || '').replace(/\u0000CARD:(\d+)\u0000/g, (x, i) => `\n\n<x-slot data-k="${nonce}" data-card="${i}"></x-slot>\n\n`);
       let html = sanitize(toHtml(md), doc, nonce);
+      // The code block's copy button goes in after the filter, which drops every button.
+      html = html.replace(new RegExp(`<x-slot data-k="${nonce}" data-copy="1"></x-slot>`, 'g'), `<button type="button" class="copy">${escapeHtml(t('html.copy'))}</button>`);
       const staticOpts = {live:true, image:src => images[src] || null, math:R.mathml,
         widget:id => {const b = blocks.find(x => x.invocationId === id);if (!b) return null;const shot = preview(b);return `<div class="ab-static">${shot ? `<img src="${escapeHtml(shot)}" alt="">` : ''}<span>🧩 ${escapeHtml(t('html.appInCard', b.title))}</span></div>`;}};
       // A slot alone in a paragraph takes the paragraph's place (a figure cannot sit inside <p>).

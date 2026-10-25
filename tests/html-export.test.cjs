@@ -133,6 +133,17 @@ test('removed content that showed on the page leaves an English notice linking t
   const anchors = [...fs.readFileSync('docs/html-filter.md', 'utf8').matchAll(/^## (.+)$/gm)].map(m => m[1].toLowerCase().replace(/[^\w\- ]/g, '').replace(/ /g, '-'));
   for (const key of [...new Set(Object.values(notices)), 'links']) assert.ok(anchors.includes(key), key);
 });
+test('a code block keeps its own copy button and no "Removed" notice; a button written in the chat is still removed', async () => {
+  const say = (id, role, text, parent, child) => ({parent, children:child ? [child] : [], message:{id, author:{role}, channel:'final', recipient:'all', content:{content_type:'text', parts:[text]}}});
+  const raw = {conversation_id:'code', title:'code', current_node:'a', mapping:{u:say('u', 'user', 'print it', null, 'a'),
+    a:say('a', 'assistant', 'Here:\n\n```python\nprint("hi")\n```\n\n<button>Click</button>', 'u', null)}};
+  const html = (await runExport(raw, {html:'single', storage:{chatExportProseHtml:'keep'}})).html;
+  const d = page(html), block = d.querySelector('.codeblock');
+  assert.ok(block.querySelector('.code-head button.copy')?.textContent);
+  assert.equal(block.querySelector('.fx-box'), null);
+  assert.equal(d.querySelectorAll('.fx-box').length, 1, 'the chat\'s own <button> leaves its notice');
+  assert.equal(d.querySelectorAll('button.copy').length, 1);
+});
 test('script URLs hidden by tabs, line breaks or control characters are removed too', () => {
   const {sanitize} = require('../extension/html-export');
   const doc = new JSDOM('').window.document;
