@@ -38,8 +38,8 @@ test('sandbox page handler executes code with Function and reports errors',()=>{
   assert.match(globalThis.ChatExportDilSandbox.handle({dil:{code:'throw Error("boom")'}}).error,/boom/);
 });
 test('panel: default ZIP uses static render, exports AppBlock HTML and complete ui JSON',async()=>{
-  const conv=fixture();// read here: a missing capture skips the test instead of failing inside the page
-  const dom=new JSDOM(`<div data-message-id="${RESOURCE}">x</div>`,{url:'https://chatgpt.com/c/6ad0d397-212c-83e9-a872-c74862120015',runScripts:'outside-only'}),w=dom.window;
+  const conv={...fixture(),conversation_id:'6ad0d397-0000-83e9-a872-c74862120015'};// read here: a missing capture skips the test instead of failing inside the page
+  const dom=new JSDOM(`<div data-message-id="${RESOURCE}">x</div>`,{url:'https://chatgpt.com/c/6ad0d397-0000-83e9-a872-c74862120015',runScripts:'outside-only'}),w=dom.window;
   const files=[],downloads=[];const read=b=>new Promise(r=>{const f=new w.FileReader();f.onload=()=>r(f.result);f.readAsText(b);});
   w.fetch=async path=>path==='/api/auth/session'?{ok:true,json:async()=>({accessToken:'t'})}:{ok:true,json:async()=>conv};
   w.ChatExportDilEvaluate=async dil=>render.evaluate(dil,vmExecute);

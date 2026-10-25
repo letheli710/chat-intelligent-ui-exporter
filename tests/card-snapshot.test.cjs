@@ -29,8 +29,8 @@ test('sandbox snapshot keeps text when a card cannot be rasterized',async()=>{
   assert.deepEqual(result.segments.map(s=>s.kind),['md','card','md']);assert.ok(result.segments[1].error);assert.equal(result.timings.cards,1);assert.ok(result.timings.totalMs>=0);assert.equal(dom.window.document.body.children.length,0);
 });
 test('panel: ZIP embeds one PNG per card with folded text, prose stays outside',async()=>{
-  const conv=fixture();// read here: a missing capture skips the test instead of failing inside the page
-  const dom=new JSDOM(`<div data-message-id="${RESOURCE}">x</div>`,{url:'https://chatgpt.com/c/6ad0d397-212c-83e9-a872-c74862120015',runScripts:'outside-only'}),w=dom.window;
+  const conv={...fixture(),conversation_id:'6ad0d397-0000-83e9-a872-c74862120015'};// read here: a missing capture skips the test instead of failing inside the page
+  const dom=new JSDOM(`<div data-message-id="${RESOURCE}">x</div>`,{url:'https://chatgpt.com/c/6ad0d397-0000-83e9-a872-c74862120015',runScripts:'outside-only'}),w=dom.window;
   const files=[];let snapshots=0;
   w.fetch=async path=>path==='/api/auth/session'?{ok:true,json:async()=>({accessToken:'t'})}:{ok:true,json:async()=>conv};
   w.ChatExportDilEvaluate=async dil=>render.evaluate(dil,vmExecute);

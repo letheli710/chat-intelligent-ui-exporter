@@ -1,6 +1,6 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('fs');const {JSDOM}=require('../scripts/i18n-env.cjs');
 const api=require('../extension/fast-text.js');
-// Prose as in H06 (6acd6206-fc04-83e9-b8bc-bae2bf0c25f9): raw <details> and <svg> written in the answer.
+// Prose as in H06: raw <details> and <svg> written in the answer.
 const prose=['Here is the picture:','','<details><summary>More</summary>','','<svg width="10" height="10"><circle r="4"/></svg>','','</details>','<!-- note -->','',
   'Code `<br>` and math $a<b$ stay; so do a < b and <https://example.com>.','','```html','<div>code</div>','```'].join('\n');
 test('prose HTML is escaped only when asked, outside code, inline code and math',()=>{
