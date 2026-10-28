@@ -334,6 +334,10 @@
 .spl.pri>.oopen{background:transparent;color:inherit;border-radius:0;border-left:1px solid color-mix(in srgb,var(--onpri) 30%,transparent);padding:9px 10px;font-size:12.5px}
 .spl.pri>.oopen:disabled{color:inherit;opacity:.5}
 .dock.narrow .spl .oopen span{display:none}
+.dock.compact{min-width:0;gap:4px}
+.dock.compact .spl .main small{display:none}
+.dock.compact .spl>button{padding:6px 10px;font-size:12px}
+.dock.compact .spl .arr,.dock.compact .spl.pri>.oopen{padding:6px 7px}
 .dock.busy .spl{opacity:.55;pointer-events:none}
 .menu{position:absolute;bottom:calc(100% + 6px);right:0;min-width:224px;background:var(--surface);color:var(--text);border-radius:6px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:8px 0;font-weight:400;font-size:13px}
 .mi{display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;white-space:nowrap;border:0;background:none;width:100%;text-align:left;color:inherit;font-size:13px}

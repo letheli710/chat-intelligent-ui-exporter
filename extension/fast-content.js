@@ -1,5 +1,5 @@
 (function mount(again={}){
-  const version='1.0.2';
+  const version='1.0.3';
   // On chatgpt.com the manifest keeps this script in every tab (resident.js says so): the two
   // buttons beside the input box are always there and open the sidebar. Injected by hand (tests,
   // the live bundle) the sidebar opens at once, and injecting it again shows or hides it.
@@ -498,16 +498,19 @@
     const form=document.querySelector('form[data-chatgpt-composer]')||input?.closest('form')||document.querySelector('form[data-type="unified-composer"]');
     return form?.querySelector('[data-composer-body]')||form||input;}
   function placeDock(){const v=cfg(),dock=D('dock');dockHost.hidden=!resident||!v.dockShow;dock.classList.toggle('busy',busyFlag);if(dockHost.hidden)return;
-    const W=innerWidth,H=innerHeight,side=host.hidden?0:Math.min(372,W),s=dock.style;let box=v.dockPos==='input'?composer()?.getBoundingClientRect():null;if(box&&!box.width)box=null;
-    s.left=s.right='';dock.classList.remove('narrow');
-    if(box){const room=W-side-box.right,bottom=`${Math.max(8,H-box.bottom)}px`,wide=Math.max(132,dock.scrollWidth)+24;
+    const W=innerWidth,H=innerHeight,side=host.hidden?0:Math.min(372,W),s=dock.style;let box=composer()?.getBoundingClientRect();if(box&&!box.width)box=null;
+    s.left=s.right='';dock.classList.remove('narrow','compact');
+    // Where they would cover the input box (its send and voice buttons): smaller, without the format, just above it.
+    const above=right=>{dock.classList.add('compact');s.right=`${right}px`;s.bottom=`${Math.max(8,H-box.top+10)}px`;};
+    if(box&&v.dockPos==='input'){const room=W-side-box.right,bottom=`${Math.max(8,H-box.bottom)}px`,wide=Math.max(132,dock.scrollWidth)+24;
       // As icons the buttons fit in less room (about 80px in a 1285px-wide window).
       dock.classList.add('narrow');const narrow=dock.scrollWidth+16;dock.classList.remove('narrow');
       if(room>=wide){s.left=`${box.right+12}px`;s.bottom=bottom;}
       else if(room>=narrow){dock.classList.add('narrow');s.left=`${box.right+8}px`;s.bottom=bottom;}
-      // A narrow window: the buttons shrink to icons above the input box's right end.
-      else{dock.classList.add('narrow');s.right=`${side+12}px`;s.bottom=`${Math.max(8,H-box.top+10)}px`;}}
-    else{s.right=`${side+16}px`;s.bottom='24px';}
+      // No room beside it: above the input box's right end.
+      else above(Math.max(side+12,W-box.right));}
+    else{s.right=`${side+16}px`;s.bottom='24px';
+      if(box){const r=dock.getBoundingClientRect();if(r.left<box.right&&r.right>box.left&&r.top<box.bottom&&r.bottom>box.top)above(side+16);}}
     positionToast();}
   function positionToast(){const r=D('dock').getBoundingClientRect(),t=D('toast');t.style.right=`${Math.max(8,innerWidth-r.right)}px`;t.style.bottom=`${Math.max(8,innerHeight-r.top+8)}px`;}
   function theme(){const h=document.documentElement,dark=h.classList.contains('dark')||!h.classList.contains('light')&&!!globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches;$('sb').classList.toggle('dark',dark);D('droot').classList.toggle('dark',dark);}

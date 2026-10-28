@@ -79,6 +79,19 @@ form{position:fixed;bottom:28px;left:calc(260px + (100vw - 260px - 768px) / 2);w
     const narrow = await page.evaluate(() => document.querySelector('[data-archive-owned="fast-text-dock"]').shadowRoot.getElementById('dock').classList.contains('narrow'));
     check(narrow && small.x >= smallForm.x + smallForm.width && small.x + small.width <= 1285, `in a narrower window the buttons stay right of the input box, as icons (${JSON.stringify(small)})`);
     await page.screenshot({path:path.join(out, '1b-buttons-narrow.png')});
+    // A 1100px-wide window leaves no room beside the input box: smaller buttons, with their words but not the format, above it.
+    await page.setViewport({width:1100, height:900});await sleep(1200);
+    const dockState = () => page.evaluate(() => {const d = document.querySelector('[data-archive-owned="fast-text-dock"]').shadowRoot, dock = d.getElementById('dock'), r = dock.getBoundingClientRect(), f = document.querySelector('[data-composer-body]').getBoundingClientRect(), shown = s => getComputedStyle(d.querySelector(s)).display !== 'none';
+      return {compact:dock.classList.contains('compact'), words:shown('#dSelect span') && shown('#dExport span'), format:shown('#dExport small'), clear:r.bottom <= f.top, inWindow:r.right <= innerWidth};});
+    let above = await dockState();
+    check(above.compact && above.words && !above.format && above.clear && above.inWindow, `with no room beside the input box the buttons sit above it, smaller (${JSON.stringify(above)})`);
+    await page.screenshot({path:path.join(out, '1c-buttons-above.png')});
+    // In the corner too, they move above the input box rather than cover its send and voice buttons.
+    const sw0 = await worker.worker();await sw0.evaluate(() => chrome.storage.local.set({dockPos:'corner'}));await sleep(1200);
+    above = await dockState();
+    check(above.compact && above.clear && above.inWindow, `in the corner the buttons do not cover the input box (${JSON.stringify(above)})`);
+    await page.screenshot({path:path.join(out, '1d-buttons-corner.png')});
+    await sw0.evaluate(() => chrome.storage.local.set({dockPos:'input'}));await sleep(1000);
     await page.setViewport({width:1440, height:900});await sleep(1000);
     // 导出 ▾ menu, then 导出 with the sidebar closed (all messages, the default Markdown 压缩包).
     await (await inShadow('fast-text-dock', '[data-menu="mExport"]')).click();await sleep(200);
