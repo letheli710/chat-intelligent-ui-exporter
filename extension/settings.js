@@ -5,7 +5,7 @@
 // localStorage holds them, the five older options under the keys they always had.
 (root => {
   const I18n=root.ChatExportI18n||(typeof module!=='undefined'?require('./i18n.js'):null),t=I18n.t;
-  const version='1.0.3';
+  const version='1.0.4';
   const defaults={
     saveAs:false,
     exportKind:'zip', profile:'generic', htmlForm:'single', htmlMap:true, autoClose:false,
@@ -119,12 +119,15 @@
   const role=(values,who)=>who==='user'?values.roleUser||t('md.roleUser'):values.roleAssistant||'ChatGPT';
   const pad=n=>String(n).padStart(2,'0');
   const day=(d=new Date())=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  const cleanPart=s=>String(s??'').replace(/\s+/g,' ').trim().replace(/[<>:"/\\|?*\x00-\x1f]/g,'_');
+  // Chrome refuses to save a name with an invisible format character (a joiner in "റിപ്പോർ‍ട്ട്" or 👨‍👩‍👧,
+  // a direction mark) or a noncharacter: "Invalid filename", and nothing is saved. They are left out.
+  const cleanPart=s=>String(s??'').replace(/[\p{Cf}\p{Noncharacter_Code_Point}]/gu,'').replace(/\s+/g,' ').trim().replace(/[<>:"/\\|?*\x00-\x1f]/g,'_');
   // Cut by characters, not UTF-16 units: half an emoji makes Chrome save replacement marks in the name.
   const cut=(s,n)=>[...s].slice(0,n).join('');
-  // A title can end in a newline or spaces ("化工工艺教学 \n"); Windows also drops trailing dots.
+  // A title can end in a newline or spaces ("化工工艺教学 \n"); Windows also drops trailing dots, and
+  // Chrome refuses a name that starts with a dot (".env 配置").
   function fileBase(values,{title,date=new Date()}){
-    const t=cut(cleanPart(title),90).replace(/[ .]+$/,'')||'ChatGPT',d=day(date),p=cut(cleanPart(values.filePrefix),40).replace(/[ .]+$/,'')||'ChatGPT';
+    const t=cut(cleanPart(title),90).replace(/^[ .]+|[ .]+$/g,'')||'ChatGPT',d=day(date),p=cut(cleanPart(values.filePrefix),40).replace(/^[ .]+|[ .]+$/g,'')||'ChatGPT';
     const base={title:t,'title-date':`${t} - ${d}`,'date-title':`${d} - ${t}`,prefix:`${p} - ${t}`}[values.fileName]||`${t} - ${d}`;
     return values.fileVersion?`${base} - v${version}`:base;
   }

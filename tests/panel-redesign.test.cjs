@@ -53,6 +53,13 @@ test('file names: title and date in the chosen order, a prefix, the version only
   assert.equal(Settings.fileBase({...v,fileName:'prefix',filePrefix:'课程/笔记'},{title,date}),'课程_笔记 - 化工工艺教学');
   assert.equal(Settings.fileBase({...v,fileVersion:true},{title:'a:b?',date}),`a_b_ - 2026-10-19 - v${Settings.version}`);
   assert.equal(Settings.fileBase(v,{title:'...',date}),'ChatGPT - 2026-10-19');
+  // Chrome's downloads refuse these (checked in Chrome 156): format characters, noncharacters, a leading dot.
+  assert.equal(Settings.fileBase(v,{title:'合同审查 റിപ്പോർ‍ട്ട്',date}),'合同审查 റിപ്പോർട്ട് - 2026-10-19');
+  assert.equal(Settings.fileBase(v,{title:'家庭 👨‍👩‍👧 ‎‮﻿­⁠a﷐',date}),'家庭 👨👩👧 a - 2026-10-19');
+  assert.equal(Settings.fileBase(v,{title:'.env 配置',date}),'env 配置 - 2026-10-19');
+  assert.equal(Settings.fileBase({...v,fileName:'prefix',filePrefix:'.笔记'},{title:'a',date}),'笔记 - a');
+  // Kept: Chrome saves these as they are.
+  assert.equal(Settings.fileBase({...v,fileName:'title'},{title:'❤️ مرحبا é a~b#c%d',date}),'❤️ مرحبا é a~b#c%d');
   // A long title is cut by characters: an emoji at the cut is kept whole or left out, never halved.
   const long=Settings.fileBase({...v,fileName:'title'},{title:'长'.repeat(89)+'🧪📚',date});
   assert.equal(long,'长'.repeat(89)+'🧪');assert.ok(!/[\ud800-\udfff]/.test(long.replace(/[\ud800-\udbff][\udc00-\udfff]/g,'')));

@@ -73,7 +73,8 @@ test('PRO-07: a title ending in a newline gives a clean heading and file name', 
   const r = await runExport(raw), day = require('../extension/settings.js').day();
   assert.match(r.md, /^---\ntitle: "化工工艺教学"\n[\s\S]*?\n---\n\n# 化工工艺教学\n\n## 我/);
   assert.equal(r.filename, `化工工艺教学 - ${day}.zip`);
-  assert.equal((await runExport(load('03'))).filename, `合同审查 റിപ്പോർ‍ട്ട് - ${day}.zip`);
+  // The joiner in the title is left out: Chrome refuses a download name that has one.
+  assert.equal((await runExport(load('03'))).filename, `合同审查 റിപ്പോർട്ട് - ${day}.zip`);
 });
 
 test('PRO-11: charts a card shows from sandbox:/mnt/data are drawn into the card and downloaded once', async () => {
