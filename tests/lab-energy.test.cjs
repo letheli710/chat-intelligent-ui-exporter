@@ -71,7 +71,7 @@ test('panel end to end: generated image, plot and sandbox CSV land in the ZIP',a
   w.chrome={runtime:{sendMessage:async()=>({id:1})}};w.URL.createObjectURL=()=> 'blob:https://chatgpt.com/t';w.URL.revokeObjectURL=()=>{};
   w.JSZip=class{file(name,data){zipped.push({name,data});}async generateAsync(){return new w.Blob(['zip']);}};
   w.ChatExportDilRender=render;w.eval(fs.readFileSync('extension/fast-text.js','utf8'));// The ui/ folder (高级 → 附带界面数据) is checked here.
-  w.localStorage.setItem('chatExport.uiFolder','true');w.eval(fs.readFileSync('extension/settings.js','utf8'));w.eval(fs.readFileSync('extension/ui-kit.js','utf8'));w.eval(fs.readFileSync('extension/fast-content.js','utf8'));
+  w.localStorage.setItem('chatExport.uiFolder','true');w.localStorage.setItem('chatExport.htmlManifest','true');w.eval(fs.readFileSync('extension/settings.js','utf8'));w.eval(fs.readFileSync('extension/ui-kit.js','utf8'));w.eval(fs.readFileSync('extension/fast-content.js','utf8'));
   const s=w.document.querySelector('[data-archive-owned]').shadowRoot,idle=async()=>{for(let i=0;i<300&&s.getElementById('preview').disabled;i++)await new Promise(r=>setTimeout(r,5));};
   await idle();(s.getElementById('kind').value='zip',s.getElementById('export').click());await idle();
   const md=zipped.find(f=>f.name==='conversation.md')?.data||s.getElementById('status').textContent,names=zipped.map(f=>f.name);

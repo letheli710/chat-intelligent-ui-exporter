@@ -81,7 +81,7 @@ form{position:fixed;bottom:28px;left:calc(260px + (100vw - 260px - 768px) / 2);w
     await page.screenshot({path:path.join(out, '1b-buttons-narrow.png')});
     // A 1100px-wide window leaves no room beside the input box: smaller buttons, with their words but not the format, above it.
     await page.setViewport({width:1100, height:900});await sleep(1200);
-    const dockState = () => page.evaluate(() => {const d = document.querySelector('[data-archive-owned="fast-text-dock"]').shadowRoot, dock = d.getElementById('dock'), r = dock.getBoundingClientRect(), f = document.querySelector('[data-composer-body]').getBoundingClientRect(), shown = s => getComputedStyle(d.querySelector(s)).display !== 'none';
+    const dockState = () => page.evaluate(() => {const d = document.querySelector('[data-archive-owned="fast-text-dock"]').shadowRoot, dock = d.getElementById('dock'), r = dock.getBoundingClientRect(), f = [...document.querySelectorAll('[data-composer-body]')].find(e => e.checkVisibility()).getBoundingClientRect(), shown = s => getComputedStyle(d.querySelector(s)).display !== 'none';
       return {compact:dock.classList.contains('compact'), words:shown('#dSelect span') && shown('#dExport span'), format:shown('#dExport small'), clear:r.bottom <= f.top, inWindow:r.right <= innerWidth};});
     let above = await dockState();
     check(above.compact && above.words && !above.format && above.clear && above.inWindow, `with no room beside the input box the buttons sit above it, smaller (${JSON.stringify(above)})`);
@@ -91,7 +91,15 @@ form{position:fixed;bottom:28px;left:calc(260px + (100vw - 260px - 768px) / 2);w
     above = await dockState();
     check(above.compact && above.clear && above.inWindow, `in the corner the buttons do not cover the input box (${JSON.stringify(above)})`);
     await page.screenshot({path:path.join(out, '1d-buttons-corner.png')});
-    await sw0.evaluate(() => chrome.storage.local.set({dockPos:'input'}));await sleep(1000);
+    // Since 2026-11 ChatGPT keeps chats opened before in the page under display:none, each with its own
+    // input box and messages, ahead of the chat on screen: the buttons still follow the input box shown.
+    await page.evaluate(() => document.body.insertAdjacentHTML('afterbegin', '<div id="cached-chat" style="display:none"><div data-message-id="old">旧对话</div><form data-chatgpt-composer=""><div data-composer-body=""><div contenteditable="true" role="textbox" data-composer-markdown="">旧输入框</div></div></form></div>'));await sleep(1200);
+    above = await dockState();
+    check(above.compact && above.clear && above.inWindow, `with a hidden chat in the page, the buttons in the corner still do not cover the input box (${JSON.stringify(above)})`);
+    await sw0.evaluate(() => chrome.storage.local.set({dockPos:'input'}));await sleep(1200);
+    above = await dockState();
+    check(above.compact && above.clear && above.inWindow, `with a hidden chat in the page, the buttons beside the input box still sit above it (${JSON.stringify(above)})`);
+    await page.evaluate(() => document.getElementById('cached-chat').remove());await sleep(1000);
     await page.setViewport({width:1440, height:900});await sleep(1000);
     // 导出 ▾ menu, then 导出 with the sidebar closed (all messages, the default Markdown 压缩包).
     await (await inShadow('fast-text-dock', '[data-menu="mExport"]')).click();await sleep(200);

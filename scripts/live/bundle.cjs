@@ -58,7 +58,7 @@ function driver(manifest, files, jszip, sandboxJs) {
     // extension may still move into its own settings). window.__liveProfile = 'obsidian' exports as
     // that profile; the ZIP keeps its ui/ folder for the checks.
     window.ChatExportSettingsMemory = {profile:window.__liveProfile || 'generic', proseHtml:window.__liveProfile === 'obsidian' ? 'keep' : 'escape', htmlCards:!!window.__liveHtmlCards, saveAs:false,
-      htmlForm:window.__liveHtml === 'single' ? 'single' : 'folder', htmlMap:window.__liveHtmlMap !== false, uiFolder:true};
+      htmlForm:window.__liveHtml === 'single' ? 'single' : 'folder', htmlMap:window.__liveHtmlMap !== false, uiFolder:true, htmlManifest:true};
     boot();await sleep(300);
     const s = panel(), $ = id => s.getElementById(id), t0 = Date.now();
     while (Date.now() - t0 < 300000 && ($('export').disabled || /正在/.test($('status').textContent))) await sleep(300);

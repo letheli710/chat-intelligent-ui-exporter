@@ -31,9 +31,10 @@ The Markdown plus every file it refers to. Keep `conversation.md` next to `asset
 <chat title> - <date>/
 ├── conversation.md    the text
 ├── assets/            original images, card pictures, embedded-app previews
-├── files/             attachments and files from the code interpreter (CSV, …)
-└── manifest.json      version, messages, timings and warnings, how each card was written
+└── files/             attachments and files from the code interpreter (CSV, …)
 ```
+
+What could not be saved in full is listed at the end of `conversation.md`. With *Settings → Advanced → Markdown: include data files* on, the ZIP also holds `manifest.json` (version, settings, timings, how each card was written) and, in `ui/`, the raw data (JSON) of each interactive card; saving to Obsidian then also writes that JSON (no `manifest.json`).
 
 - **Attachments**: PDFs, spreadsheets and other files you uploaded go to `files/`, linked above your question as *Attachment: name*.
 - **Images**: uploaded, generated and search-result images are saved in full size. A row of search images becomes one thumbnail strip, with the originals listed in a collapsed block below.
@@ -45,7 +46,7 @@ The Markdown plus every file it refers to. Keep `conversation.md` next to `asset
 
 - **Image-and-text list cards** (one picture with a block of text, repeated) become a Markdown table: thumbnail on the left (click for the original), editable text on the right. With **Picture cards as HTML** (Beta) on, they are written as HTML side by side instead, closer to ChatGPT; only apps that show HTML, such as Obsidian, display it.
 - **All other cards** are drawn as a PNG in the extension's sandbox page, with the search images inside them, and their text follows in a collapsible quote.
-- If a step fails (an image that did not download, a picture that cannot be decoded), the card falls back to a PNG, and if there is no PNG either, to text only. `manifest.json` records which way each card was written and why.
+- If a step fails (an image that did not download, a picture that cannot be decoded), the card falls back to a PNG, and if there is no PNG either, to text only. With *Markdown: include data files* on, `manifest.json` records which way each card was written and why.
 - Text that a card only shows in another state (another tab, an opened section, something that appears after ticking a box) is listed at the end of the answer, under *Card content in other states*.
 
 ## HTML page
@@ -64,7 +65,7 @@ Both open and work the same, even with a double-click from your disk (`file://`)
 
 | | One HTML file (default) | ZIP |
 | --- | --- | --- |
-| What you get | `<title> - <date>.html` | `<title> - <date>.html.zip` with `conversation.html`, `assets/`, `files/`, `manifest.json` |
+| What you get | `<title> - <date>.html` | `<title> - <date>.html.zip` with `conversation.html`, `assets/`, `files/` (and `manifest.json` with *Advanced → HTML (ZIP): include manifest.json* on; the page never reads it) |
 | Good | One file, easy to forward and store | Small page that opens fast; originals can be taken out |
 | Watch out | About a third larger than the pictures in it | Unzip and keep the folders together |
 
@@ -101,7 +102,7 @@ Choose **Obsidian** as the format. *Export* becomes **Save | Open**:
 | Picture cards as HTML (Beta) | Off: a table, other cards as PNG with collapsed text | Off (you can turn it on) |
 | HTML written in answers (`<svg>`, `<details>`) | Escaped, shown as text, as on ChatGPT | Kept, so it works |
 
-Generic is for apps that may strip HTML (GitHub, Notion import, plain editors). Code blocks, inline code, formulas and autolinks are never affected. `manifest.json` records the choices in `exportProfile`.
+Generic is for apps that may strip HTML (GitHub, Notion import, plain editors). Code blocks, inline code, formulas and autolinks are never affected. With *Markdown: include data files* on, `manifest.json` records the choices in `exportProfile`.
 
 ## Not supported yet
 

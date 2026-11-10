@@ -68,7 +68,8 @@ async function exportIn(raw, {respond, storage = {}, fault, searchImages = false
   w.JSZip = class {file(name, data) {files.push({name, data});}async generateAsync() {return new w.Blob(['zip']);}};
   w.addEventListener('error', e => errors.push('window error: ' + e.message));
   // Panel settings (e.g. chatExportHtmlCards) as the page's localStorage holds them.
-  for (const [k, v] of Object.entries(storage)) w.localStorage.setItem(k, v);
+  // 高级 → 附带调试数据 on, so the checks can read manifest.json (a test can pass 'false').
+  for (const [k, v] of Object.entries({'chatExport.uiFolder': 'true', 'chatExport.htmlManifest': 'true', ...storage})) w.localStorage.setItem(k, v);
   // fault: force a card fallback ('list', 'image', 'thumb', 'table', 'html' or 'png').
   if (fault) w.chatExportFault = fault;
   // The HTML form and the map choice, as the settings hold them.

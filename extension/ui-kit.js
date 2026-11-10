@@ -30,7 +30,7 @@
   const kindIcon={md:'file',zip:'archive',html:'code',pdf:'printer',obsidian:'gem'};
   // The words are looked up when the settings are drawn, in the language picked then.
   const TIPS={};
-  for(const k of ['saveAs','profile','prose','cards','htmlForm','map','fver','yaml','pending','ui','shortcut','obs','ver','language'])Object.defineProperty(TIPS,k,{enumerable:true,get:()=>t(`tip.${k}`)});
+  for(const k of ['saveAs','profile','prose','cards','htmlForm','map','fver','yaml','pending','ui','htmlManifest','shortcut','obs','ver','language'])Object.defineProperty(TIPS,k,{enumerable:true,get:()=>t(`tip.${k}`)});
   // An ⓘ with help also opens the explanation page (help.html#<help>) on click or Enter.
   const info=(key,help)=>`<span class="info" tabindex="0" role="${help?'button':'img'}" aria-label="${esc(TIPS[key])}${help?esc(t('set.helpHint')):''}" data-tip="${esc(TIPS[key])}"${help?` data-help="${help}"`:''}>${icon('info')}</span>`;
   const onOff=(on,off)=>(v,ctx,own)=>own?t(on):t(off||'set.off');
@@ -74,8 +74,10 @@
       // Alt+Shift+E only on a first install, and a key put on its own toolbar-panel row opens that instead.
       {key:'shortcut',label:t('set.shortcut'),tip:'shortcut',value:(v,ctx)=>!ctx.keys?'':ctx.keys.sidebar?t('set.shortcut.value',ctx.keys.sidebar):ctx.keys.action?t('set.shortcut.onAction',ctx.keys.action):t('set.shortcut.none'),control:'button',text:t('set.shortcut.button')},
     ]},
-    {key:'adv',title:t('set.adv'),summary:v=>v.uiFolder?t('set.adv.uiOn'):t('set.adv.summary'),rows:[
+    {key:'adv',title:t('set.adv'),summary:v=>v.uiFolder||v.htmlManifest?t('set.adv.uiOn'):t('set.adv.summary'),rows:[
       {key:'uiFolder',label:t('set.uiFolder'),tip:'ui',value:onOff('set.uiFolder.on'),control:'switch'},
+      // The page never reads manifest.json; a single HTML file has nowhere to put it.
+      {key:'htmlManifest',label:t('set.htmlManifest'),tip:'htmlManifest',dim:v=>v.htmlForm==='single',value:(v,ctx,own)=>v.htmlForm==='single'?t('set.htmlManifest.single'):own?t('set.htmlManifest.on'):t('set.off'),control:'switch'},
       {key:'raw',label:t('set.raw'),value:()=>t('set.raw.value'),control:'button',text:t('set.raw.button')},
       {key:'reset',label:t('set.reset'),value:()=>t('set.reset.value'),control:'button',text:t('set.reset.button')},
     ]},
@@ -254,7 +256,7 @@
 .cx .info .ic{width:14px;height:14px}
 .cx .info:hover,.cx .info:focus-visible{color:var(--pri);outline:none}
 .cx .info[data-help]{cursor:pointer}
-.tipbox{position:fixed;z-index:2147483647;left:0;top:0;max-width:280px;background:#2d2b28;color:#f6f4f0;font:12px/1.6 Roboto,"Segoe UI",${I18n.cjkFonts()},system-ui,sans-serif;padding:8px 11px;border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:none;opacity:0;transform:translateY(3px);transition:opacity .12s,transform .12s}
+.tipbox{position:fixed;z-index:2147483647;left:0;top:0;max-width:280px;white-space:pre-line;background:#2d2b28;color:#f6f4f0;font:12px/1.6 Roboto,"Segoe UI",${I18n.cjkFonts()},system-ui,sans-serif;padding:8px 11px;border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:none;opacity:0;transform:translateY(3px);transition:opacity .12s,transform .12s}
 .tipbox.show{opacity:1;transform:none}
 .cx .xmsg{margin:10px 12px 0;padding:8px 11px;border-radius:12px;background:color-mix(in srgb,var(--pri) 12%,var(--surface));font-size:12px;white-space:pre-wrap}
 .cx .xmsg.err{background:color-mix(in srgb,var(--err) 11%,var(--surface))}

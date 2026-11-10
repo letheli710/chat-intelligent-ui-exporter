@@ -37,6 +37,7 @@ test('panel: ZIP embeds one PNG per card with folded text, prose stays outside',
   w.ChatExportDilSnapshot=async dil=>{snapshots++;return {segments:render.segments(render.evaluate(dil,vmExecute)).map(s=>s.kind==='card'?{...s,png:new Uint8Array([137,80,78,71]).buffer,width:300,height:120}:s)};};
   w.chrome={runtime:{sendMessage:async()=>({id:1})}};w.URL.createObjectURL=()=> 'blob:https://chatgpt.com/t';w.URL.revokeObjectURL=()=>{};
   w.JSZip=class{file(name,data){files.push({name,data});}async generateAsync(){return new w.Blob(['zip']);}};
+  w.localStorage.setItem('chatExport.uiFolder','true');w.localStorage.setItem('chatExport.htmlManifest','true');
   w.ChatExportDilRender=render;w.eval(fs.readFileSync('extension/fast-text.js','utf8'));w.eval(fs.readFileSync('extension/settings.js','utf8'));w.eval(fs.readFileSync('extension/ui-kit.js','utf8'));w.eval(fs.readFileSync('extension/fast-content.js','utf8'));
   const s=w.document.querySelector('[data-archive-owned]').shadowRoot;await idle(s);assert.equal(snapshots,3);
   s.getElementById('preview').click();await idle(s);assert.doesNotMatch(s.getElementById('output').value,/assets\/card-|\[!note\]/);assert.match(s.getElementById('output').value,/当前值：\*\*关\*\*/);
@@ -159,6 +160,7 @@ test('panel: a picture-list card becomes a table of thumbnails and text; every f
     {name:'html option, table and png',html:true,fault:'png',layout:'text'}];
   for(const c of cases){
     const dom=new JSDOM('<div></div>',{url:'https://chatgpt.com/c/6ad0d397-0000-83e9-a872-c74862120096',runScripts:'outside-only'}),w=dom.window;const files=[];
+    w.localStorage.setItem('chatExport.uiFolder','true');w.localStorage.setItem('chatExport.htmlManifest','true');
     if(c.html)w.localStorage.setItem('chatExportHtmlCards','1');
     if(c.fault)w.chatExportFault=c.fault;
     if(c.fault==='png')w.chatExportFault='table',c.both=true;

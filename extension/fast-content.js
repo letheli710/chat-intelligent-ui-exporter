@@ -1,5 +1,5 @@
 (function mount(again={}){
-  const version='1.0.4';
+  const version='1.0.6';
   // On chatgpt.com the manifest keeps this script in every tab (resident.js says so): the two
   // buttons beside the input box are always there and open the sidebar. Injected by hand (tests,
   // the live bundle) the sidebar opens at once, and injecting it again shows or hides it.
@@ -34,10 +34,15 @@
   const htmlCards=()=>cfg().htmlCards,escapeProseHtml=()=>cfg().proseHtml==='escape';
   // A saved chat (/c/id) or a shared link (/share/id), which has its own read endpoint.
   const target=()=>{const share=location.pathname.match(/\/share\/([^/]+)/)?.[1];return share?{id:share,share:true}:{id:location.pathname.match(/\/c\/([^/]+)/)?.[1],share:false};};
+  // Since 2026-11 ChatGPT keeps chats opened before in the page under a display:none wrapper (no hidden or
+  // aria-hidden), each with its own messages and input box; a project chat opened by its /c/ link even
+  // leaves a hidden copy of itself. Only what is rendered belongs to the chat on screen.
+  const rendered=n=>n.checkVisibility?.()??true;
+  const onScreen=selector=>[...document.querySelectorAll(selector)].filter(rendered);
   // Since 2026-10 ChatGPT has no data-message-id: each turn lists its message ids in data-chatgpt-search-message-ids (last one is the newest).
-  const lastMessage=()=>{const n=[...document.querySelectorAll('[data-message-id],[data-chatgpt-search-message-ids]')].filter(n=>!n.closest('[hidden],[aria-hidden="true"]')).at(-1);return n?.getAttribute('data-message-id')||n?.getAttribute('data-chatgpt-search-message-ids')?.trim().split(/\s+/).at(-1);};
+  const lastMessage=()=>{const n=onScreen('[data-message-id],[data-chatgpt-search-message-ids]').filter(n=>!n.closest('[hidden],[aria-hidden="true"]')).at(-1);return n?.getAttribute('data-message-id')||n?.getAttribute('data-chatgpt-search-message-ids')?.trim().split(/\s+/).at(-1);};
   // The stop button is now a plain aria-label="Stop" in the composer; a turn being written is data-talvt-turn-state="in_progress" in every language.
-  const streaming=()=>document.querySelector('[data-testid="stop-button"],button[aria-label="Stop streaming"],button[aria-label="Stop generating"],button[aria-label="停止生成"],form[data-chatgpt-composer] button[aria-label="Stop"],[data-talvt-turn-state="in_progress"]');
+  const streaming=()=>onScreen('[data-testid="stop-button"],button[aria-label="Stop streaming"],button[aria-label="Stop generating"],button[aria-label="停止生成"],form[data-chatgpt-composer] button[aria-label="Stop"],[data-talvt-turn-state="in_progress"]')[0];
   function busy(value){busyFlag=value;for(const id of ['reload','all','mine','answers','invert','none','preview','export','kind','raw','gear','gear2'])$(id).disabled=value;placeDock();if(!value&&host.hidden&&resident&&$('status').textContent)toast($('status').textContent);$('stop').disabled=!value;ui.querySelectorAll('#list input').forEach(n=>n.disabled=value);if(!value)relocalize();}
   function assertCurrent(){if(!state)throw Error(t('err.notRead'));if(state.url!==route())throw Error(t('err.switched'));if(streaming())throw Error(t('err.streaming'));const leaf=lastMessage();if(leaf&&state.leaf&&leaf!==state.leaf&&!state.messages.some(m=>m.id===leaf))throw Object.assign(Error(t('err.branchChanged')),{reread:true});controller?.signal.throwIfAborted();}
   function ids(){return [...ui.querySelectorAll('#list input:checked')].map(n=>n.dataset.messageId);}
@@ -86,7 +91,7 @@
   const mapLink=/!\[[^\]]*\]\(map:(\d+)\)/g;
   async function captureMaps(m,assets,warnings,html=false){
     const order=[...new Set([...m.md.matchAll(mapLink)].map(x=>x[1]))];if(!order.length)return;
-    const canvases=[...document.querySelectorAll(`[data-dil-message-id="${String(m.id).replace(/["\\]/g,'\\$&')}"] canvas.mapboxgl-canvas`)];
+    const canvases=onScreen(`[data-dil-message-id="${String(m.id).replace(/["\\]/g,'\\$&')}"] canvas.mapboxgl-canvas`);
     const shots=canvases.length?await mapShots(canvases):[],paths=new Map();let n=0;
     for(const [k,index] of order.entries()){const blob=shots[k];
       if(blob){const path=`assets/map-${safeName(m.id)}-${++n}.jpg`;assets.push({path,blob,messageId:m.id,kind:'map-image'});paths.set(index,path);}
@@ -330,7 +335,7 @@
     result.htmlStats=out.stats;
     if(form==='single')return new Blob([out.html],{type:'text/html;charset=utf-8'});
     const zip=new JSZip();zip.file('conversation.html',out.html);for(const f of out.files)zip.file(f.path,f.blob);
-    zip.file('manifest.json',JSON.stringify({version,format:'html',form,source:state.url,messages:result.messages,warnings:result.warnings,html:out.stats,assets:out.files.map(f=>f.path),exportedAt:new Date().toISOString()},null,2));
+    if(cfg().htmlManifest)zip.file('manifest.json',JSON.stringify({version,format:'html',form,source:state.url,messages:result.messages,warnings:result.warnings,html:out.stats,assets:out.files.map(f=>f.path),exportedAt:new Date().toISOString()},null,2));
     return zip.generateAsync({type:'blob'});}
   // 文件名 settings: title and date in the chosen order, the version at the end only when asked.
   function filename(ext){return `${Settings.fileBase(cfg(),{title:state.title})}.${ext}`;}
@@ -340,7 +345,8 @@
     else if(mode!=='preview'){let blob;if(mode==='html')blob=await htmlBlob(result);else if(mode==='zip'){
       const zip=new JSZip();zip.file('conversation.md',result.md);for(const asset of result.assets)zip.file(asset.path,asset.blob);
       const manifest={version,loadedVersion:(()=>{try{return chrome.runtime.getManifest?.().version??null;}catch{return null;}})(),source:state.url,exportProfile:{profile:cfg().profile,htmlCards:htmlCards(),proseHtml:cfg().proseHtml,yaml:cfg().yaml,uiFolder:cfg().uiFolder},visibility:{hiddenDuringExport,atEnd:document.visibilityState},messages:result.messages,warnings:result.warnings,cards:result.cards,timings:{...state.timings,exportPrepareMs:performance.now()-started},assets:result.assets.map(({path,messageId,width,height,tiles,kind})=>({path,messageId,width,height,tiles,kind})),exportedAt:new Date().toISOString()};
-      zip.file('manifest.json',JSON.stringify(manifest,null,2));blob=await zip.generateAsync({type:'blob'});
+      // The export record is for developers, like ui/: only with 高级 → 附带调试数据 (what went wrong is also at the end of the Markdown).
+      if(cfg().uiFolder)zip.file('manifest.json',JSON.stringify(manifest,null,2));blob=await zip.generateAsync({type:'blob'});
     }else blob=new Blob([result.md],{type:'text/markdown;charset=utf-8'});
     assertCurrent();const url=URL.createObjectURL(blob);try{await send({type:'archive:download',url,filename:filename(extOf(mode)),saveAs:cfg().saveAs});}finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}}
     const list=items=>items.filter(Boolean).join(t('list.sep')),notes=result.warnings.length;lastWarn='';
@@ -493,9 +499,10 @@
   function toast(text,keep=false){const t=D('toast'),s=$('status');if(text&&text===s.textContent&&s.querySelector('.chip'))t.replaceChildren(...[...s.childNodes].map(n=>n.cloneNode(true)));else t.textContent=text;t.classList.add('show');positionToast();clearTimeout(toastTimer);if(!keep)toastTimer=setTimeout(()=>t.classList.remove('show'),3500);}
   // ChatGPT's input box (only read for its position): the rounded box inside its composer form, as
   // in 2026-10 (form[data-chatgpt-composer] > [data-composer-body]), or the older #prompt-textarea form.
+  // The rendered one: chats opened before keep a hidden input box of their own.
   function composer(){
-    const input=document.querySelector('[data-composer-markdown][contenteditable="true"],div[contenteditable="true"][role="textbox"],#prompt-textarea');
-    const form=document.querySelector('form[data-chatgpt-composer]')||input?.closest('form')||document.querySelector('form[data-type="unified-composer"]');
+    const input=onScreen('[data-composer-markdown][contenteditable="true"],div[contenteditable="true"][role="textbox"],#prompt-textarea')[0];
+    const form=onScreen('form[data-chatgpt-composer]')[0]||input?.closest('form')||onScreen('form[data-type="unified-composer"]')[0];
     return form?.querySelector('[data-composer-body]')||form||input;}
   function placeDock(){const v=cfg(),dock=D('dock');dockHost.hidden=!resident||!v.dockShow;dock.classList.toggle('busy',busyFlag);if(dockHost.hidden)return;
     const W=innerWidth,H=innerHeight,side=host.hidden?0:Math.min(372,W),s=dock.style;let box=composer()?.getBoundingClientRect();if(box&&!box.width)box=null;

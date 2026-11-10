@@ -5,14 +5,14 @@
 // localStorage holds them, the five older options under the keys they always had.
 (root => {
   const I18n=root.ChatExportI18n||(typeof module!=='undefined'?require('./i18n.js'):null),t=I18n.t;
-  const version='1.0.4';
+  const version='1.0.6';
   const defaults={
     saveAs:false,
     exportKind:'zip', profile:'generic', htmlForm:'single', htmlMap:true, autoClose:false,
     fileName:'title-date', filePrefix:'ChatGPT', fileVersion:false,
     yaml:true, model:true, proseHtml:'escape', htmlCards:false, timestamps:false, sources:false, roleUser:'', roleAssistant:'ChatGPT',
     dockShow:true, dockPos:'input',
-    uiFolder:false,
+    uiFolder:false, htmlManifest:false,
     // The name of the folder 保存到 Obsidian writes into, for display; the folder itself (its handle)
     // is kept by obsidian.html, which also writes this name.
     obsidianFolder:'',

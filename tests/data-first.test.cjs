@@ -40,7 +40,7 @@ test('ZIP is data-first: original images, ui JSON, raw debug export',async()=>{
   w.chrome={runtime:{sendMessage:async m=>{downloads.push(m);return {id:1};}}};w.URL.createObjectURL=b=>{downloads.blob=b;return 'blob:https://chatgpt.com/t';};w.URL.revokeObjectURL=()=>{};
   w.JSZip=class{file(name,data){files.push({name,data});}async generateAsync(){return new w.Blob(['zip']);}};
   w.eval(fs.readFileSync('extension/fast-text.js','utf8'));// The ui/ folder (高级 → 附带界面数据) is checked here.
-  w.localStorage.setItem('chatExport.uiFolder','true');w.eval(fs.readFileSync('extension/settings.js','utf8'));w.eval(fs.readFileSync('extension/ui-kit.js','utf8'));w.eval(fs.readFileSync('extension/fast-content.js','utf8'));const s=w.document.querySelector('[data-archive-owned]').shadowRoot;await idle(s);
+  w.localStorage.setItem('chatExport.uiFolder','true');w.localStorage.setItem('chatExport.htmlManifest','true');w.eval(fs.readFileSync('extension/settings.js','utf8'));w.eval(fs.readFileSync('extension/ui-kit.js','utf8'));w.eval(fs.readFileSync('extension/fast-content.js','utf8'));const s=w.document.querySelector('[data-archive-owned]').shadowRoot;await idle(s);
   assert.equal(s.getElementById('live'),null);assert.equal(s.getElementById('pick'),null);
   s.getElementById('preview').click();await idle(s);assert.match(s.getElementById('output').value,/〔图片：下载 ZIP 可获取原图〕/);
   (s.getElementById('kind').value='zip',s.getElementById('export').click());await idle(s);

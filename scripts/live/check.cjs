@@ -50,10 +50,14 @@ function check(dir) {
   const has = new Set(files), referenced = new Set(['conversation.md', 'manifest.json']);
   if (!has.has('conversation.md')) return {errors:['no conversation.md'], warnings, files:files.length};
   const md = fs.readFileSync(path.join(dir, 'conversation.md'), 'utf8');
-  let manifest = {};try {manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));} catch {errors.push('manifest.json missing or invalid');}
+  // manifest.json is there only with 高级 → 附带调试数据 on (1.0.5+); what went wrong is also at the end of conversation.md.
+  let manifest = null;if (has.has('manifest.json')) try {manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));} catch {errors.push('manifest.json invalid');}
+  manifest ||= {};
   for (const w of manifest.warnings || []) warnings.push('exporter: ' + w);
-  if (!/^# \S/.test(md)) errors.push('conversation.md does not start with a "# title" line');
-  if (/^# .*\s$/m.test(md.split('\n')[0])) errors.push('title line ends with whitespace');
+  // The title comes after the Obsidian properties (YAML), which are on by default.
+  const body = md.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n+/, '');
+  if (!/^# \S/.test(body)) errors.push('conversation.md does not start with a "# title" line');
+  if (/^# .*\s$/m.test(body.split('\n')[0])) errors.push('title line ends with whitespace');
   // Every relative link from Markdown or a saved HTML page resolves to a file in the archive.
   const sources = [['conversation.md', md], ...files.filter(f => /\.html?$/.test(f)).map(f => [f, fs.readFileSync(path.join(dir, f), 'utf8')])];
   for (const [from, text] of sources) for (const href of links(from === 'conversation.md' ? prose(md) : text)) {
@@ -85,7 +89,7 @@ function check(dir) {
     // ui/*.json is the card data, kept for tools rather than linked.
     if (!referenced.has(f) && !/\.html?$|^ui\//.test(f)) warnings.push(`not linked from conversation.md: ${f}`);
   }
-  return {errors, warnings, files:files.length, cards:(manifest.cards || []).length, messages:(manifest.messages || []).length, bytes:md.length};
+  return {errors, warnings, files:files.length, cards:manifest.cards?.length ?? null, messages:manifest.messages?.length ?? null, bytes:md.length};
 }
 
 module.exports = {check};

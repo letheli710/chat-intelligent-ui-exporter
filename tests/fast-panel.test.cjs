@@ -15,6 +15,7 @@ test('ZIP download names the file by title and date, honours save-as, refuses a 
  w.fetch=async path=>({ok:true,json:async()=>path==='/api/auth/session'?{accessToken:'test'}:{title:'sample',current_node:'answer',mapping:{answer:{parent:null,children:[],message:{id:'answer',author:{role:'assistant'},content:{parts:['API original']}}}}}});
  w.chrome={runtime:{sendMessage:async m=>{downloads.push(m);return {id:1};}}};w.URL.createObjectURL=()=>'blob:https://chatgpt.com/test';w.URL.revokeObjectURL=()=>{};
  w.JSZip=class{file(name,data){files.push({name,data});}async generateAsync(){return new w.Blob(['archive']);}};
+ w.localStorage.setItem('chatExport.uiFolder','true');w.localStorage.setItem('chatExport.htmlManifest','true');
  w.eval(fs.readFileSync('extension/fast-text.js','utf8'));w.eval(fs.readFileSync('extension/settings.js','utf8'));w.eval(fs.readFileSync('extension/ui-kit.js','utf8'));w.eval(fs.readFileSync('extension/fast-content.js','utf8'));const s=w.document.querySelector('[data-archive-owned]').shadowRoot;await idle(s);
  (s.getElementById('kind').value='zip',s.getElementById('export').click());await idle(s);
  const manifest=JSON.parse(files.find(f=>f.name==='manifest.json').data);assert.ok(manifest.timings.readMs>=0);assert.deepEqual(manifest.messages,['answer']);
@@ -25,6 +26,41 @@ test('ZIP download names the file by title and date, honours save-as, refuses a 
  // Chrome reloads an extension's isolated world without removing its old DOM.
  w.__fastTextPanel=undefined;w.eval(fs.readFileSync('extension/settings.js','utf8'));w.eval(fs.readFileSync('extension/ui-kit.js','utf8'));w.eval(fs.readFileSync('extension/fast-content.js','utf8'));assert.equal(w.document.querySelectorAll('[data-archive-owned="fast-text"]').length,1);
  dom.window.close();
+});
+test('a chat ChatGPT keeps hidden in the page (display:none, 2026-11) is not the chat on screen',async()=>{
+ // The page shows branch one; the API's current_node is branch two. After it, a hidden chat opened before, still answering.
+ const dom=new JSDOM('<main><div data-chatgpt-search-message-ids="q b1">Branch one</div></main><div style="display:none"><div data-chatgpt-search-message-ids="other-q other-a">old chat</div><div data-talvt-turn-state="in_progress"></div><form data-chatgpt-composer=""><button aria-label="Stop"></button></form></div>',{url:'https://chatgpt.com/c/chat',runScripts:'outside-only'}),w=dom.window;
+ // jsdom draws nothing: what Chrome's checkVisibility() says for a display:none ancestor.
+ w.Element.prototype.checkVisibility=function(){for(let n=this;n;n=n.parentElement)if(n.style?.display==='none')return false;return true;};
+ const data={title:'Branches',current_node:'b2',mapping:{q:{parent:null,children:['b1','b2'],message:{id:'q',author:{role:'user'},content:{parts:['Question']}}},b1:{parent:'q',children:[],message:{id:'b1',author:{role:'assistant'},content:{parts:['Branch one']}}},b2:{parent:'q',children:[],message:{id:'b2',author:{role:'assistant'},content:{parts:['Branch two']}}}}};
+ w.fetch=async path=>({ok:true,json:async()=>path==='/api/auth/session'?{accessToken:'test'}:data});
+ w.eval(fs.readFileSync('extension/fast-text.js','utf8'));w.eval(fs.readFileSync('extension/settings.js','utf8'));w.eval(fs.readFileSync('extension/ui-kit.js','utf8'));w.eval(fs.readFileSync('extension/fast-content.js','utf8'));
+ const s=w.document.querySelector('[data-archive-owned]').shadowRoot;for(let i=0;i<30&&s.getElementById('preview').disabled;i++)await new Promise(r=>setTimeout(r,5));
+ assert.doesNotMatch(s.getElementById('status').textContent,/回答|answer/i);assert.equal(s.querySelectorAll('#list input').length,2);
+ s.getElementById('preview').click();await new Promise(r=>setTimeout(r,5));
+ assert.match(s.getElementById('output').value,/Branch one/);assert.doesNotMatch(s.getElementById('output').value,/Branch two|old chat/);
+ dom.window.close();
+});
+test('by default the ZIPs hold only what the user wants: manifest.json only with its own switch in 高级',async()=>{
+ const run=async(kind,store={})=>{
+  const dom=new JSDOM('<div data-message-id="answer">source</div>',{url:'https://chatgpt.com/c/chat',runScripts:'outside-only'}),w=dom.window;
+  const files=[],idle=async s=>{for(let i=0;i<100&&s.getElementById('preview').disabled;i++)await new Promise(r=>setTimeout(r,5));};
+  w.fetch=async path=>({ok:true,json:async()=>path==='/api/auth/session'?{accessToken:'test'}:{title:'sample',current_node:'answer',mapping:{answer:{parent:null,children:[],message:{id:'answer',author:{role:'assistant'},content:{parts:['API original']}}}}}});
+  w.chrome={runtime:{sendMessage:async()=>({id:1})}};w.URL.createObjectURL=()=>'blob:https://chatgpt.com/test';w.URL.revokeObjectURL=()=>{};
+  w.JSZip=class{file(name,data){files.push({name,data});}async generateAsync(){return new w.Blob(['archive']);}};
+  // The HTML page itself is not under test here, only what goes into its ZIP.
+  w.ChatExportHtml={build:async()=>({html:'<p>page</p>',files:[],stats:{}})};w.localStorage.setItem('chatExportHtmlForm','folder');
+  for(const [k,v] of Object.entries(store))w.localStorage.setItem('chatExport.'+k,JSON.stringify(v));
+  w.eval(fs.readFileSync('extension/fast-text.js','utf8'));w.eval(fs.readFileSync('extension/settings.js','utf8'));w.eval(fs.readFileSync('extension/ui-kit.js','utf8'));w.eval(fs.readFileSync('extension/fast-content.js','utf8'));const s=w.document.querySelector('[data-archive-owned]').shadowRoot;await idle(s);
+  (s.getElementById('kind').value=kind,s.getElementById('export').click());await idle(s);
+  dom.window.close();return files.map(f=>f.name);};
+ // Markdown: 「Markdown 附带数据文件」; HTML (ZIP): 「HTML（ZIP）附带 manifest.json」. Each switch only touches its own format.
+ assert.deepEqual(await run('zip'),['conversation.md']);
+ assert.deepEqual(await run('zip',{uiFolder:true}),['conversation.md','manifest.json']);
+ assert.deepEqual(await run('zip',{htmlManifest:true}),['conversation.md']);
+ assert.deepEqual(await run('html'),['conversation.html']);
+ assert.deepEqual(await run('html',{htmlManifest:true}),['conversation.html','manifest.json']);
+ assert.deepEqual(await run('html',{uiFolder:true}),['conversation.html']);
 });
 const chat=(id,text)=>({title:id,current_node:'m-'+id,mapping:{['m-'+id]:{parent:null,children:[],message:{id:'m-'+id,author:{role:'assistant'},content:{parts:[text]}}}}});
 const ready=async s=>{for(let i=0;i<100&&s.getElementById('preview').disabled;i++)await new Promise(r=>setTimeout(r,5));};
