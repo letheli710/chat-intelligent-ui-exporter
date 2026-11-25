@@ -9,7 +9,8 @@ function walk(dir, base = dir) {
   return fs.readdirSync(dir, {withFileTypes:true}).flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name), base) : [path.relative(base, path.join(dir, e.name)).replace(/\\/g, '/')]);
 }
 // Markdown outside fenced code and inline code, where placeholders would be visible text.
-const prose = md => md.replace(/^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[ \t]*$/gm, '').replace(/`[^`\n]*`/g, '');
+// $$ formulas (also inside quotes and callouts) are not prose either: "[a](b)" there is math, not a link.
+const prose = md => md.replace(/^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[ \t]*$/gm, '').replace(/^((?:[ \t]*>[ \t]?)*)\$\$[ \t]*\n[\s\S]*?^\1\$\$[ \t]*$/gm, '').replace(/`[^`\n]*`/g, '');
 function pngSize(buf) {return buf.length > 24 && buf.readUInt32BE(0) === 0x89504e47 ? {w:buf.readUInt32BE(16), h:buf.readUInt32BE(20)} : null;}
 const isLocal = href => href && !/^(?:[a-z][\w+.-]*:|#|\/\/)/i.test(href);
 

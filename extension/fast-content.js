@@ -1,5 +1,5 @@
 (function mount(again={}){
-  const version='1.0.6';
+  const version='1.0.8';
   // On chatgpt.com the manifest keeps this script in every tab (resident.js says so): the two
   // buttons beside the input box are always there and open the sidebar. Injected by hand (tests,
   // the live bundle) the sidebar opens at once, and injecting it again shows or hides it.
@@ -54,7 +54,7 @@
     state={...data,url,leaf,conversationId:where.share?data.conversationId:where.id,timings:{readMs:performance.now()-start}};
     state.timings.render=await renderStatic(data.messages,sandbox);state.timings.renderMs=performance.now()-start-state.timings.readMs;
     $('list').append(...data.messages.map(messageRow));if(pending){pick(pending);pending=null;}else for(const id of chips)$(id).classList.toggle('on',id==='all');counted();syncSettings();
-    $('status').textContent=t('status.read',data.messages.length,seconds(state.timings.readMs))+staleNotice();
+    $('status').textContent=t('status.read',data.messages.length,seconds(state.timings.readMs))+staleNotice();redrawCards();
   }catch(e){if(current===generation){fail(e.message);counted();}}finally{sandbox?.client.close();if(current===generation)busy(false);}}
   // Created before the conversation is read so the sandbox page, fonts and
   // canvas are ready by the time the cards are drawn.
@@ -67,15 +67,21 @@
   async function renderStatic(messages,sandbox){const started=performance.now(),targets=messages.filter(m=>m.dil?.code),round=v=>Math.round(v);
     if(!targets.length||!dilRender)return {uiMessages:targets.length};
     $('status').textContent=t('status.rendering',targets.length);
-    const client=sandbox?.client,evaluate=globalThis.ChatExportDilEvaluate||client,snapshot=globalThis.ChatExportDilSnapshot||client?.snapshot,preview=globalThis.ChatExportAppBlockPreview||client?.appblock,toMd=tree=>dilRender.toMarkdown(tree,{widget:id=>`\u0000APPBLOCK:${id}\u0000`});
+    const client=sandbox?.client,evaluate=globalThis.ChatExportDilEvaluate||client,snapshot=globalThis.ChatExportDilSnapshot||client?.snapshot,preview=globalThis.ChatExportAppBlockPreview||client?.appblock,toMd=cardMd;
     // All messages go to the sandbox at once; cards within a message are also drawn in parallel.
     await Promise.all(targets.map(async m=>{const sent=performance.now();
       // Widgets (code blocks, charts) resolve from the message's content references.
       const dil={...m.dil,contentReferences:m.contentReferences};
       // Cards are drawn to PNG in the sandbox; if that fails, text alone is kept.
       // Their search images are downloaded first (the sandbox cannot fetch them) and drawn in.
-      const cards=(async()=>{try{try{dil.images=await pictures(m);}catch(e){if(e?.name==='AbortError')throw e;}const result=await snapshot(dil);m.segments=result.segments.map(s=>({kind:s.kind,tree:s.tree,md:toMd(s.tree),png:s.png,width:s.width,height:s.height,error:s.error,list:s.kind==='card'?pictureListOf(s.tree):null,looseList:s.kind==='card'?pictureListOf(s.tree,true):null}));m.staticMd=m.segments.map(s=>s.md).filter(Boolean).join('\n\n');m.variants=result.variants||[];m.renderTimings={...result.timings,roundTripMs:round(performance.now()-sent)};}
-      catch{try{m.staticMd=toMd(await evaluate(dil));}catch(e){m.renderError=e.message;}}})();
+      // The pictures are kept on the message, so a card drawn again later does not download them again.
+      const cards=(async()=>{try{try{dil.images=m.cardPictures=await pictures(m);}catch(e){if(e?.name==='AbortError')throw e;}const result=await snapshot(dil);applySnapshot(m,result);m.renderTimings={...result.timings,roundTripMs:round(performance.now()-sent)};}
+      // A drawing that failed as a whole (it timed out) while the program runs keeps the cards, each
+      // marked as having no picture: the HTML export still shows them working, the ZIP keeps their text
+      // and says so, and they are drawn again later.
+      // When the program itself fails, ChatGPT's fallback text is used, and what the server resolved
+      // on its own (quizzes, search images) is added from the card's data; no code runs for that.
+      catch(e){m.drawError=e?.message||String(e);try{const tree=await evaluate(dil);applySnapshot(m,{segments:dilRender.segments(tree).map(s=>s.kind==='card'?{...s,error:m.drawError}:s),variants:[]});}catch(e){m.renderError=e.message;try{m.rescuedMd=rescueMd(dilRender.rescued?.(dil));}catch{m.rescuedMd=null;}}}})();
       // Each AppBlock runs briefly in its own sandboxed frame and is drawn to a preview PNG.
       const shots=Promise.all((preview?dilRender.appBlocks(m.dil,m.contentReferences):[]).map(async b=>{const t=performance.now();try{return [b.invocationId,{...await preview(b),ms:round(performance.now()-t)}];}catch(e){return [b.invocationId,{error:e.message,ms:round(performance.now()-t)}];}}));
       const [,previews]=await Promise.all([cards,shots]);m.appPreviews=Object.fromEntries(previews);
@@ -83,6 +89,32 @@
     }));
     return {uiMessages:targets.length,wallMs:round(performance.now()-started),sandboxLoadMs:client?.stats.loadMs??null,warmup:sandbox?await sandbox.warm:null,
       messages:targets.map(m=>({id:m.id,...(m.renderTimings||{}),...(m.renderError?{error:m.renderError}:{})}))};}
+  // What the fallback text leaves out, folded under it: quizzes and images from the card data, then the card's other words.
+  const rescueMd=r=>{if(!r)return null;const body=[r.tree?cardMd(r.tree).trim():'',r.words.map(w=>`- ${w}`).join('\n')].filter(Boolean).join('\n\n');return body?`> [!note]- ${t('md.rescued')}\n${body.split('\n').map(l=>l?`> ${l}`:'>').join('\n')}`:null;};
+  const cardMd=tree=>dilRender.toMarkdown(tree,{widget:id=>`\u0000APPBLOCK:${id}\u0000`});
+  function applySnapshot(m,result){m.segments=result.segments.map(s=>({kind:s.kind,tree:s.tree,md:cardMd(s.tree),png:s.png,width:s.width,height:s.height,error:s.error,list:s.kind==='card'?pictureListOf(s.tree):null,looseList:s.kind==='card'?pictureListOf(s.tree,true):null}));m.staticMd=m.segments.map(s=>s.md).filter(Boolean).join('\n\n');m.variants=result.variants||[];m.unknownComponents=dilRender?.unknownComponents?.(m.segments.map(s=>s.tree))||[];}
+  // A card drawn while the tab is in the background has no layout and no picture. Those cards are
+  // drawn again, one message at a time, when the tab is visible again and before an export that uses
+  // card pictures. A new result is kept only if it has more pictures; a card that keeps failing is tried three times.
+  // A drawing that failed as a whole (it timed out) left only the text: that message is drawn again too,
+  // and the first drawing that works is kept even without pictures, for the text of its other states.
+  const pictured=segments=>(segments||[]).filter(s=>s.kind==='card'&&s.png).length;
+  // Every picture any try drew is kept: a card drawn before and missing now keeps the earlier picture,
+  // only when it is the same card with the same content (a program can order its cards differently
+  // each run); a card that cannot be matched keeps its text and is reported, never another card's picture.
+  const sameCard=(a,b)=>JSON.stringify(a.tree)===JSON.stringify(b.tree);
+  const mergeSegments=(old,next)=>!old||old.length!==next.length||old.some((s,i)=>s.kind!==next[i].kind)?next:next.map((s,i)=>s.kind==='card'&&!s.png&&old[i].png&&sameCard(s,old[i])?{...s,png:old[i].png,width:old[i].width,height:old[i].height,error:undefined}:s);
+  const failedCards=m=>!m.renderError&&(m.redraws||0)<3&&(m.segments?m.segments.some(s=>s.kind==='card'&&!s.png&&s.error):!!m.drawError);
+  let redrawing=null;
+  function redrawCards(only=null){if(redrawing)return redrawing;const owner=state,todo=(state?.messages||[]).filter(m=>m.dil?.code&&failedCards(m)&&(!only||only.includes(m.id)));
+    if(!todo.length||!dilRender||document.visibilityState!=='visible')return Promise.resolve(0);
+    redrawing=(async()=>{const sandbox=startSandbox(),snapshot=globalThis.ChatExportDilSnapshot||sandbox?.client?.snapshot;let fixed=0;try{if(!snapshot)return 0;
+      for(const m of todo){if(state!==owner||document.visibilityState!=='visible')break;m.redraws=(m.redraws||0)+1;
+        try{const result=await snapshot({...m.dil,contentReferences:m.contentReferences,images:m.cardPictures||{}});
+          const segments=mergeSegments(m.segments,result.segments||[]);
+          if(state===owner&&(m.segments&&!m.drawError?pictured(segments)>pictured(m.segments):segments.length)){applySnapshot(m,{...result,segments});delete m.drawError;fixed++;}}catch{}}
+    }finally{sandbox?.client.close();redrawing=null;}return fixed;})();return redrawing;}
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!busyFlag)redrawCards();});
   const safeName=id=>String(id).replace(/[^\w-]/g,'_');
   const uiImageUrls=m=>api.dilImageUrls(m.dil);
   // Maps are copied from the page, where ChatGPT has already drawn them (Mapbox, WebGL).
@@ -205,18 +237,21 @@
   // Each card becomes an image, with its text folded underneath (searchable, not duplicated on screen).
   // Pictures already drawn in the card are left out of the folded text.
   // Every card's outcome (table, png or text, and why a table fell back) goes into manifest.json.
-  async function cardMarkdown(m,assets,warnings,cards,pdf){let n=0;const parts=[];for(const s of m.segments)parts.push(await (async()=>{
+  // Cards without a picture are reported once per message: how many, and the first reason.
+  async function cardMarkdown(m,assets,warnings,cards,pdf){let n=0;const parts=[],failed=[];for(const s of m.segments)parts.push(await (async()=>{
     let fallback;
     const html=htmlCards()&&!pdf,list=s.kind==='card'?(s.list||(html?s.looseList:null)):null;
     if(list){try{const out=await pictureTable(m,{...s,list},n+1,assets,html);cards.push({messageId:m.id,card:++n,layout:out.layout,pictures:list.length,...(out.fallback?{fallback:out.fallback}:{})});return out.md;}catch(e){fallback=e?.message||String(e);}}
-    if(s.kind!=='card'||!s.png||fault('png')){if(s.kind==='card'){cards.push({messageId:m.id,card:null,layout:'text',fallback});if(s.error)warnings.push(`${m.id}: ${t('warn.cardImageFailed',s.error)}`);}return s.md;}
+    if(s.kind!=='card'||!s.png||fault('png')){if(s.kind==='card'){cards.push({messageId:m.id,card:null,layout:'text',fallback});if(s.error)failed.push(s.error);}return s.md;}
     cards.push({messageId:m.id,card:n+1,layout:'png',fallback});
     const path=`assets/card-${safeName(m.id)}-${++n}.png`;
     assets.push({path,blob:new Blob([s.png],{type:'image/png'}),messageId:m.id,width:s.width,height:s.height,kind:'card-image'});
     const words=s.md.replace(/!\[[^\]]*\]\(([^)\s]+)\) ?/g,(x,u)=>m.drawnImages?.has(u)?'':x).replace(/\n{3,}/g,'\n\n').trim();
     const text=words?`\n\n> [!note]- ${t('md.cardText')}\n${words.split('\n').map(l=>l?`> ${l}`:'>').join('\n')}`:'';
     return `![${t('md.card')}](${path})${text}`;
-  })());return parts.filter(Boolean).join('\n\n');}
+  })());
+  if(failed.length)warnings.push(`${m.id}: ${failed.length>1?t('warn.cardImagesFailed',failed.length,failed[0]):t('warn.cardImageFailed',failed[0])}`);
+  return parts.filter(Boolean).join('\n\n');}
   const blocksOf=m=>dilRender&&m.dil?dilRender.appBlocks(m.dil,m.contentReferences):[];
   // Text the cards show only in another state, folded under the answer (card images show the default state).
   function withVariants(m,md){if(!m.variants?.length)return md;const titles=new Map(blocksOf(m).map(b=>[b.invocationId,b.title]));
@@ -238,12 +273,22 @@
   async function send(message){const response=await chrome.runtime.sendMessage(message);if(response?.error)throw Error(response.error);return response;}
   // Recorded in the manifest so an export shows whether the tab went to the background.
   let hiddenDuringExport=false;document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')hiddenDuringExport=true;});
-  async function build(zip,mode){const html=mode==='html',pdf=mode==='pdf';assertCurrent();const selected=ids();if(!selected.length)throw Error(t('err.selectOne'));hiddenDuringExport=document.visibilityState==='hidden';const started=performance.now(),messages=[],assets=[],warnings=[],cards=[];
+  async function build(zip,mode){const html=mode==='html',pdf=mode==='pdf';assertCurrent();const selected=ids();if(!selected.length)throw Error(t('err.selectOne'));
+    // Card pictures that failed while the tab was in the background are drawn again first.
+    if(zip&&!html){const n=state.messages.filter(m=>selected.includes(m.id)&&m.dil?.code&&failedCards(m)).length;if(n&&document.visibilityState==='visible'){$('status').textContent=t('status.rendering',n);await redrawCards(selected);assertCurrent();}}
+    hiddenDuringExport=document.visibilityState==='hidden';const started=performance.now(),messages=[],assets=[],warnings=[],cards=[];
     for(const original of state.messages){if(!selected.includes(original.id))continue;
       // The PDF uses the cards as the ZIP does (picture lists as their stable table, never as HTML) and shows prose HTML as text, as the page does.
-      const md=original.staticMd?(zip&&original.segments?(html?htmlSegments(original):await cardMarkdown(original,assets,warnings,cards,pdf)):original.staticMd):escapeProseHtml()||pdf?original.mdEscaped??original.md:original.md;
-      if(original.dil?.code&&!original.staticMd&&original.renderError)warnings.push(`${original.id}: ${t('warn.renderFailed',original.renderError)}`);
-      messages.push({...original,md:withVariants(original,md).replace(/!\[[^\]]*\]\(assets\/(?!card-)[^)]+\)/g,'')});
+      // A message with cards goes through its cards even when they have no text at all (a drawing of
+      // shapes): its picture, or its working card in the HTML. If nothing at all is left to show (no
+      // text, no picture), ChatGPT's fallback text stands in.
+      const fallbackText=escapeProseHtml()||pdf?original.mdEscaped??original.md:original.md;
+      const withCards=zip&&original.segments&&(original.staticMd||original.segments.some(s=>s.kind==='card'));
+      const text=withCards?((html?htmlSegments(original):await cardMarkdown(original,assets,warnings,cards,pdf)).trim()||fallbackText):original.staticMd||fallbackText;
+      const md=!original.staticMd&&original.rescuedMd?`${text}\n\n${original.rescuedMd}`:text;
+      // Components added by ChatGPT after this version: their text is kept, and the note says which ones.
+      if(original.unknownComponents?.length)warnings.push(`${original.id}: ${t('warn.unknownComponents',original.unknownComponents.join(', '))}`);
+      if(original.dil?.code&&!original.staticMd&&original.renderError)warnings.push(`${original.id}: ${t(original.rescuedMd?'warn.renderRescued':'warn.renderFailed',original.renderError)}`);      messages.push({...original,md:withVariants(original,md).replace(/!\[[^\]]*\]\(assets\/(?!card-)[^)]+\)/g,'')});
     }
     if(zip)await attachData(messages,assets,warnings,html);
     // Only the text: what the ZIP would hold is named where it was.
@@ -261,7 +306,7 @@
     if(fileIds.length)$('status').textContent=t('status.downloadingImages',fileIds.length);
     const conversationId=state.conversationId;
     // Files the code interpreter wrote, linked as sandbox:/mnt/data/... in the answer.
-    const linkedItems=conversationId?messages.flatMap(m=>[...new Set([...m.md.matchAll(sandboxLink)].map(x=>x[1]))].map(link=>({messageId:m.id,link,path:decodeURIComponent(link.slice(8))}))):[];
+    const linkedItems=conversationId?messages.flatMap(m=>[...new Set([...m.md.matchAll(sandboxLink)].map(x=>x[1]))].map(link=>({messageId:m.id,link,written:link.slice(8),path:decodedPath(link.slice(8))}))):[];
     const cardItems=conversationId?messages.filter(m=>m.dil).flatMap(m=>cardSandboxPaths(m)
       .filter(path=>!linkedItems.some(x=>x.messageId===m.id&&x.path===decodedPath(path))).map(path=>({messageId:m.id,path,name:decodedPath(path).split('/').pop(),card:true}))):[];
     const sandboxItems=[...linkedItems,...cardItems];
@@ -316,7 +361,7 @@
         return `${quote}${before}${lines.join(`\n${quote}`)}`;});
       // AppBlocks hidden in the default state (e.g. behind a checkbox) are still listed.
       const hidden=blocks.filter(b=>!linked.has(b.path)).map(b=>`\n> - ${t('md.hiddenApp',b.title,`[${b.path}](${b.path})`)}`).join('');
-      const record={messageId:m.id,format:'model_dil_v2',source:m.dilSource,staticMarkdown:m.staticMd??null,variants:m.variants||[],renderError:m.renderError??null,appBlocks:blocks.map(({id,invocationId,title,path})=>({id,invocationId,title,path})),localAssets,dil:m.dil,contentReferences:m.contentReferences};
+      const record={messageId:m.id,format:'model_dil_v2',source:m.dilSource,staticMarkdown:m.staticMd??null,variants:m.variants||[],renderError:m.renderError??null,rescuedMarkdown:m.rescuedMd??null,unknownComponents:m.unknownComponents||[],appBlocks:blocks.map(({id,invocationId,title,path})=>({id,invocationId,title,path})),localAssets,dil:m.dil,contentReferences:m.contentReferences};
       // The raw interface data is for developers (高级 → 附带界面数据).
       if(cfg().uiFolder)assets.push({path,blob:new Blob([JSON.stringify(record,null,2)],{type:'application/json'}),messageId:m.id,kind:'ui-data'});
       // Replies that compiled to plain prose need no pointer in the note; their JSON is still saved.

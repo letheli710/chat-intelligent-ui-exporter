@@ -56,3 +56,35 @@ test('ZIP is data-first: original images, ui JSON, raw debug export',async()=>{
   const raw=JSON.parse(await read(downloads.blob));assert.equal(raw.mapping.b.message.metadata.model_dil_v2.code,dil.code);assert.ok(!JSON.stringify(raw).includes('Bearer'));
   dom.window.close();
 });
+test('code files are asked for as the link spells them, then decoded after a 404',async()=>{
+  // On chatgpt.com since 2026-11-22: "data #1.csv" only under "data%20%231.csv"; plain names either way.
+  const asked=[];const only=new Set(['/mnt/data/data%20%231.csv','/mnt/data/plain.csv','/mnt/data/old name.csv']);
+  const fetch=async path=>{
+    if(path==='/api/auth/session')return {ok:true,json:async()=>({accessToken:'t'})};
+    if(path.includes('/interpreter/download')){const p=new URL(path,'https://chatgpt.com').searchParams.get('sandbox_path');asked.push(p);
+      return only.has(p)?{ok:true,status:200,json:async()=>({download_url:'https://files.example/'+encodeURIComponent(p)})}:{ok:false,status:404};}
+    return {ok:true,blob:async()=>({type:'text/csv'})};};
+  const items=[{messageId:'m',written:'/mnt/data/data%20%231.csv',path:'/mnt/data/data #1.csv'},
+    {messageId:'m',written:'/mnt/data/plain.csv',path:'/mnt/data/plain.csv'},
+    // The old behaviour (decoded accepted, link spelling not) still works.
+    {messageId:'m',written:'/mnt/data/old%20name.csv',path:'/mnt/data/old name.csv'},
+    {messageId:'m',written:'/mnt/data/gone%20%232.csv',path:'/mnt/data/gone #2.csv'}];
+  const r=await api.downloadSandboxFiles({items,conversationId:'chat',fetch,concurrency:1});
+  assert.equal(r[0].localPath,'files/data__1.csv');assert.ok(r[0].blob);assert.equal(r[0].path,'/mnt/data/data #1.csv');
+  assert.ok(r[1].blob);assert.ok(r[2].blob);assert.equal(r[3].error,'HTTP 404');
+  assert.deepEqual(asked,['/mnt/data/data%20%231.csv','/mnt/data/plain.csv','/mnt/data/old%20name.csv','/mnt/data/old name.csv','/mnt/data/gone%20%232.csv','/mnt/data/gone #2.csv']);
+});
+test('panel end to end: code files named with "#", brackets or a bare "%" are saved and linked',async()=>{
+  const {runExport}=require('../scripts/edge-harness.cjs');
+  const text='Files: [data #1.csv](sandbox:/mnt/data/data%20%231.csv), [summary (final).xlsx](sandbox:/mnt/data/summary%20%28final%29.xlsx), [100%](sandbox:/mnt/data/100%report.csv) and [all files.zip](sandbox:/mnt/data/all%20files.zip).';
+  const raw={conversation_id:'chat',title:'files',current_node:'b',mapping:{
+    a:{parent:null,children:['b'],message:{id:'a',author:{role:'user'},content:{content_type:'text',parts:['make files']}}},
+    b:{parent:'a',children:[],message:{id:'b',author:{role:'assistant'},content:{content_type:'text',parts:[text]}}}}};
+  // Like chatgpt.com since 2026-11-22: "#" and brackets only as the link spells them.
+  const respond=p=>{if(!p.includes('/interpreter/download'))return null;const s=new URL(p,'https://chatgpt.com').searchParams.get('sandbox_path');
+    return /[#()]/.test(s)?{ok:false,status:404,json:async()=>({detail:'Interpreter file not found'})}:null;};
+  const r=await runExport(raw,{respond});
+  assert.deepEqual(r.errors,[]);assert.deepEqual(r.warnings,[]);
+  for(const f of ['files/data__1.csv','files/summary__final_.xlsx','files/100_report.csv','files/all_files.zip'])assert.ok(r.files.has(f),f);
+  assert.doesNotMatch(r.md,/sandbox:/);assert.match(r.md,/\[data #1\.csv\]\(files\/data__1\.csv\)/);
+});

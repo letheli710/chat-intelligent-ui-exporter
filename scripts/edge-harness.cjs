@@ -9,6 +9,7 @@
 // page (pdf). snapshot and appPreview replace the placeholder card and AppBlock images, and
 // message answers what the panel asks the background worker (search images); all three are
 // used by scripts/pdf-check.cjs, which draws the cards in a real browser.
+// visible: the tab is in the foreground (document.visibilityState "visible"); jsdom is otherwise "prerender".
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const env = require('./i18n-env.cjs'), {JSDOM} = env;
 const root = path.join(__dirname, '..');
@@ -21,9 +22,9 @@ async function runExport(raw, {locale, ...options} = {}) {
   const before = env.locale;if (locale) env.use(locale);
   try {return await exportIn(raw, options);} finally {env.use(before);}
 }
-async function exportIn(raw, {respond, storage = {}, fault, searchImages = false, html = null, maps = true, mode = 'zip', snapshot, appPreview, message} = {}) {
+async function exportIn(raw, {respond, storage = {}, fault, searchImages = false, html = null, maps = true, mode = 'zip', snapshot, appPreview, message, visible = false} = {}) {
   const id = raw.conversation_id || 'chat';
-  const dom = new JSDOM('<div></div>', {url:`https://chatgpt.com/c/${id}`, runScripts:'outside-only'}), w = dom.window;
+  const dom = new JSDOM('<div></div>', {url:`https://chatgpt.com/c/${id}`, runScripts:'outside-only', ...(visible ? {pretendToBeVisual:true} : {})}), w = dom.window;
   // ChatGPT titles the tab after the chat.
   w.document.title = raw.title || 'ChatGPT';
   const files = [], errors = [], requests = [], sent = [], drawn = [];

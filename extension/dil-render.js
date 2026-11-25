@@ -40,6 +40,8 @@
       const out = {type:String(type), props:{}, children:children.flat(Infinity)};
       for (const [key, value] of Object.entries(all)) {
         if (live && typeof value === 'function' && /^on[A-Z]/.test(key)) {(out.props.__on ||= {})[key] = live.handlers.push(value) - 1;continue;}
+        // A state's own setter passed as onChange: the control is bound to that state (stateVariants).
+        if (!live && typeof value === 'function' && value.__stateKey && /^on[A-Z]/.test(key)) {out.props.__bind = value.__stateKey;continue;}
         const v = plain(value);if (v !== undefined) out.props[key] = v;
       }
       return out;
@@ -52,7 +54,8 @@
         const key = typeof options?.key === 'string' ? options.key : `#${stateIndex}`, value = typeof initial === 'function' ? initial() : initial;stateIndex++;
         states?.push({key, value});
         if (live) return [live.get(key, value), next => live.set(key, next)];
-        return [Object.prototype.hasOwnProperty.call(overrides, key) ? overrides[key] : value, noop];
+        // The setter does nothing here; it carries its key so a control it is passed to can be traced back.
+        return [Object.prototype.hasOwnProperty.call(overrides, key) ? overrides[key] : value, Object.assign(() => {}, {__stateKey:key})];
       },
       useConstants:() => dil.constants || {},
       useAppData:select => typeof select === 'function' ? select(dil.appData || {}) : dil.appData || {},
@@ -113,9 +116,111 @@
     // Other required components render their children; childless ones keep their main text.
     const summary = props => ['title','label','text','value','summary','role_summary','name','query'].map(k => props[k]).find(v => typeof v === 'string' && v.trim());
     for (const name of [].concat(dil.requiredComponents || [])) if (typeof name === 'string' && /^[A-Z][\w$]*$/.test(name) && !(name in scope)) scope[name] = props => {const kids = [].concat(props.children ?? []).filter(c => c != null && c !== false);return kids.length ? {type:'Fragment', props:{}, children:kids} : summary(props) ? {type:'text', props:{}, children:[t('dil.component', name, summary(props))]} : '';};
-    execute(dil.code, scope);
+    // A program that fails after it has rendered (in code that runs afterwards) keeps what it rendered.
+    try {execute(dil.code, scope);} catch (e) {if (!tree) throw e;}
     if (!tree) throw Error(t('dil.noRender'));
     return resolveWidgets(plain(tree), dil);
+  }
+  // When the card program fails, ChatGPT's fallback text is used. What it leaves out is recovered
+  // without running the program: {tree, words} or null.
+  //  - tree: quizzes and search images the server resolved (componentResults), built from that
+  //    data; only questions and images the fallback text does not already have.
+  //  - words: text written in the program (string literals) and its constants that reads as words
+  //    and is in neither, in the order it appears (a quiz built in the code keeps its questions,
+  //    options and explanations there).
+  const RESCUED = new Set(['LearningQuiz', 'AsyncImage', 'AsyncImageGroup']);
+  const squeeze = s => String(s).replace(/\s+/g, ' ').trim();
+  // A character code from text that may be malformed: one out of range is the replacement character.
+  const codePoint = n => Number.isInteger(n) && n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : String.fromCharCode(0xfffd);
+  // The fallback is Markdown: "01 &#124; Title", "\*". Compared as the text it shows.
+  const shownText = md => String(md).replace(/&#(\d+);/g, (x, n) => codePoint(Number(n))).replace(/&#x([\da-f]+);/gi, (x, n) => codePoint(parseInt(n, 16)))
+    .replace(/&(amp|lt|gt|quot|apos|nbsp);/g, (x, n) => ({amp:'&', lt:'<', gt:'>', quot:'"', apos:"'", nbsp:' '})[n]).replace(/\\([\\`*_{}[\]()#+\-.!|<>~])/g, '$1');
+  // Recovering never stops the export: if anything in it fails, the fallback text alone is kept.
+  function rescued(dil) {try {return rescuedParts(dil);} catch {return null;}}
+  function rescuedParts(dil) {
+    const fallback = squeeze(shownText(dil?.fallbackMarkdown || '')), has = s => !!squeeze(s) && fallback.includes(squeeze(s));
+    const results = dil?.appData?.opGenui?.componentResults, answers = [];
+    const items = (results && typeof results === 'object' ? Object.entries(results) : []).filter(([, r]) => RESCUED.has(r?.componentName) && r.status !== 'failed' && r.state && typeof r.state === 'object').map(([id, r]) => {
+      // A question counts as there only with all its options: a fallback that lists the question alone
+      // still gets the whole question (options, answer, explanation), lettered as the data letters it.
+      // A question there with its options but without the explanation of its answer gets that line
+      // alone, naming the answer by its text: the fallback may letter the options in another order.
+      if (r.componentName === 'LearningQuiz') {
+        const listed = q => has(q?.prompt ?? '') && (Array.isArray(q?.options) ? q.options : []).every(o => has(o?.label ?? ''));
+        const all = Array.isArray(r.state.questions) ? r.state.questions : [], questions = all.filter(q => !listed(q));
+        for (const q of all.filter(listed)) {
+          const correct = new Set([].concat(q?.correct_values || []).map(String)), right = (q.options || []).filter(o => correct.has(String(o?.value)));
+          const feedback = right.map(o => o?.feedback).find(f => typeof f === 'string' && f.trim());
+          if (right.length && feedback && !has(feedback)) answers.push({prompt:String(q.prompt), line:t('dil.answer', right.map(o => String(o.label ?? o.value)).join(t('dil.sep'))) + t('dil.feedback', feedback)});
+        }
+        return questions.length ? [id, {...r, state:{...r.state, questions}}] : null;
+      }
+      const images = (Array.isArray(r.state.images) ? r.state.images : []).filter(i => typeof i?.content_url === 'string' && !fallback.includes(i.content_url));
+      return images.length ? [id, {...r, state:{...r.state, images}}] : null;
+    }).filter(Boolean);
+    let tree = null;
+    if (items.length) try {
+      const data = {...dil, code:'-', appData:{...dil.appData, opGenui:{...dil.appData.opGenui, componentResults:Object.fromEntries(items)}}};
+      tree = evaluate(data, (code, s) => s.DIL.render(s.__dil.jsx(s.__dil.Fragment, null, ...items.map(([id, r]) => s.__dil.jsx(s[r.componentName], {__resolutionId:id})))));
+    } catch {tree = null;}
+    if (answers.length) tree = {type:'Fragment', props:{}, children:[...(tree ? [tree] : []), ...answers.flatMap(a => [{type:'text', props:{weight:'semibold'}, children:[a.prompt]}, {type:'caption', props:{}, children:[a.line]}])]};
+    // Text and its order: the program's string literals (names of properties and values of
+    // properties that are not text are left out), then its constants. A long text counts as shown when
+    // the fallback has it anywhere. A short one (an option, a label) is added only between two long
+    // texts that are missing, as the options between a missing question and its missing explanation;
+    // elsewhere it is likely a label the fallback has, or a piece of a sentence it has.
+    const shown = squeeze(`${fallback} ${tree ? toMarkdown(tree) : ''}`), constants = [], long = x => x.length >= 12;
+    (function walk(v) {if (typeof v === 'string') constants.push(v); else if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === 'object') Object.values(v).forEach(walk);})(dil?.constants);
+    const seen = new Set(), all = [...literalTexts(dil?.code).filter(x => !x.isKey && !NOT_TEXT_KEY.test(x.key || '')).map(x => x.text), ...constants].map(squeeze).filter(x => readsAsWords(x) && !seen.has(x) && seen.add(x));
+    const missing = all.map(x => long(x) && !shown.includes(x));
+    const near = (i, step) => {for (let k = i + step; k >= 0 && k < all.length; k += step) if (long(all[k])) return k;return -1;};
+    // Before the first or after the last long text, a short one the fallback has as a whole line, list
+    // item, table cell or button ("[重新测试]") is shown; between two missing ones it is kept (an option).
+    const lines = new Set(shownText(dil?.fallbackMarkdown || '').split('\n').flatMap(l => l.split('|')).map(l => squeeze(l.replace(/^\s*(?:[#>*+-]+|\d+[.)])\s*/, '').replace(/\*\*|__/g, '').replace(/^\[(.*)\]$/, '$1'))).filter(Boolean));
+    const side = (k, x) => k < 0 ? !lines.has(x) : missing[k];
+    const words = all.filter((x, i) => {if (long(x)) return missing[i];const before = near(i, -1), after = near(i, 1);return (before >= 0 || after >= 0) && side(before, x) && side(after, x);});
+    return tree || words.length ? {tree, words} : null;
+  }
+  const NOT_TEXT_KEY = /^(?:id|key|type|kind|variant|tone|color|icon|size|align|justify|direction|style|className|class|href|src|url|locale\w*|lang|\w*(?:[Qq]uery|[Cc]ategory|Id|_id))$/;
+  // Words, not code: a letter of a script written without spaces (CJK, kana, hangul), Cyrillic or
+  // Arabic words, or two Latin words with no code punctuation. Not URLs, paths or CSS.
+  function readsAsWords(s) {
+    if (s.length < 2 || /^[a-z][\w+.-]*:\/\/|^[#.\/]|\b\d+(?:\.\d+)?(?:px|em|rem|vh|vw|deg|ms)\b|^(?:rgba?|hsla?|var|calc|url)\(/i.test(s)) return false;
+    if (/[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff\uac00-\ud7af]/.test(s) || /[\u0400-\u04ff\u0600-\u06ff]{3}/.test(s)) return true;
+    return (s.match(/(?:^|[\s(])[A-Za-z\u00c0-\u024f]{2,}(?=[\s,.;:!?)]|$)/g) || []).length >= 2 && !/[{}<>=;]|=>/.test(s);
+  }
+  // The string literals of compiled card code, in order, as {text, key, isKey}: key is the property
+  // a literal is the value of ({q:"…"}, {"title":"…"}, title="…"); isKey marks a quoted property name.
+  // Template literals are read by their fixed parts.
+  function literalTexts(code) {
+    const s = String(code || ''), out = [];
+    const escape = at => {const c = s[at + 1], hex = n => codePoint(parseInt(s.slice(at + 2, at + 2 + n), 16) || 0x20);
+      if (c === 'n' || c === 'r' || c === 't') return [' ', 2];
+      // \u{…}: at most six hex digits; anything else is read as the letter u.
+      if (c === 'u' && s[at + 2] === '{') {const end = s.indexOf('}', at);return end > at + 3 && end <= at + 9 ? [codePoint(parseInt(s.slice(at + 3, end), 16)), end - at + 1] : ['u', 2];}
+      if (c === 'u') return [hex(4), 6];
+      if (c === 'x') return [hex(2), 4];
+      return [c ?? '', 2];};
+    let previous = null, previousEnd = -1;
+    for (let i = 0; i < s.length; i++) {
+      const q = s[i];
+      if (q === '/' && s[i + 1] === '/') {const end = s.indexOf('\n', i);if (end < 0) break;i = end;continue;}
+      if (q === '/' && s[i + 1] === '*') {const end = s.indexOf('*/', i + 2);if (end < 0) break;i = end + 1;continue;}
+      if (q !== '"' && q !== "'" && q !== '`') continue;
+      const before = s.slice(Math.max(0, i - 60), i);
+      const key = previous && /^\s*:\s*$/.test(s.slice(previousEnd + 1, i)) ? previous.text : (before.match(/([A-Za-z_$][\w$-]*)\s*[:=]\s*$/) || [])[1] || '';
+      let text = '', j = i + 1;
+      for (; j < s.length && s[j] !== q; j++) {
+        if (s[j] === '\\') {const [ch, n] = escape(j);text += ch;j += n - 1;continue;}
+        // A template literal's expression ends this part; its own strings are not read.
+        if (q === '`' && s[j] === '$' && s[j + 1] === '{') {out.push({text, key});text = '';let depth = 0;for (j += 1; j < s.length; j++) {if (s[j] === '{') depth++; else if (s[j] === '}' && --depth === 0) break;}continue;}
+        if (q !== '`' && s[j] === '\n') break;
+        text += s[j];
+      }
+      const item = {text, key, isKey:/^\s*:/.test(s.slice(j + 1, j + 3))};
+      out.push(item);previous = item;previousEnd = j;i = j;
+    }
+    return out;
   }
   // Code blocks and some charts are client-defined widgets whose content lives
   // in content_references (linked by clientDefinedWidgets[id].refIndex).
@@ -174,10 +279,74 @@
     return {...node, children:(node.children || []).map(n => resolveWidgets(n, dil))};
   }
   // Markdown-native constructs stay text; everything else is UI drawn as an image.
-  const inlineTypes = new Set(['bold','italic','code','link','strike','strikethrough','math','badge','icon','cite','input','textarea','favicon','label']);
+  const inlineTypes = new Set(['bold','italic','code','link','strike','strikethrough','underline','math','badge','icon','cite','input','textarea','date-picker','favicon','label']);
+  // A slider's tick labels (marks:[{value, label}]) with their place along the track, 0–100.
+  const sliderMarks = p => {
+    const min = Number(p.min ?? 0), max = Number(p.max ?? 100);
+    return (Array.isArray(p.marks) ? p.marks : []).filter(m => m && typeof m === 'object' && Number.isFinite(Number(m.value)) && m.label != null && String(m.label).trim())
+      .map(m => ({label:String(m.label), pct:max > min ? Math.max(0, Math.min(100, (Number(m.value) - min) / (max - min) * 100)) : 0}));
+  };
+  const marksHtml = p => {const marks = sliderMarks(p);return marks.length ? `<div class="slider-marks">${marks.map(m => `<span style="left:${m.pct.toFixed(2)}%;transform:${m.pct <= 0 ? 'none' : m.pct >= 100 ? 'translateX(-100%)' : 'translateX(-50%)'}">${escapeHtml(m.label)}</span>`).join('')}</div>` : '';};
+  // A date picker's value: "2026-11-24", or a range ({start, end} or [from, to]); else its placeholder.
+  const dateText = (value, placeholder) => {
+    const one = v => typeof v === 'string' || typeof v === 'number' ? String(v).trim() : '';
+    const parts = Array.isArray(value) ? value.map(one) : value && typeof value === 'object' ? [one(value.start ?? value.from), one(value.end ?? value.to)] : [one(value)];
+    return parts.filter(Boolean).join(' – ') || one(placeholder);
+  };
   const textOf = node => node == null || node === false || node === true ? '' : typeof node !== 'object' ? String(node) : Array.isArray(node) ? node.map(textOf).join('') : textOf(node.children);
   const isInlineNode = node => node != null && (typeof node !== 'object' || (!Array.isArray(node) && inlineTypes.has(node.type) && !(node.type === 'math' && node.props?.block)));
   const UI_CONTAINERS = new Set(['box','card','row','grid','grid-item']);
+  // Every component this renderer draws on purpose. Anything else is one ChatGPT added after it
+  // was written: its words (children and text props) are still written out, and the export names it.
+  // A popover's trigger and content are both shown, so nothing of it is lost.
+  const KNOWN_TYPES = new Set(['Fragment','__chatgptClientDefinedWidget','text','title','caption','code-block','writing-block','checkbox','radio','radio-group','select',
+    'segmented-control','slider','divider','spacer','button','table','table-row','table-cell','list','list-item','blockquote','image','image-group','map-image','chart',
+    'pie-chart','svg','col','form','flow','flow-item','carousel','carousel-item','pressable','popover','popover-trigger','popover-content', ...inlineTypes, ...UI_CONTAINERS]);
+  const isUnknown = node => node != null && typeof node === 'object' && !Array.isArray(node) && typeof node.type === 'string' && !KNOWN_TYPES.has(node.type) && !SVG_TAGS.has(node.type);
+  // Props whose text a reader sees, in reading order. Other props count only when they read as
+  // words (a space or a non-Latin letter), so codes ("primary", "row"), colors, lengths and URLs stay out.
+  // value and name are often codes ("opt_a"), so they too must read as words, or be a number.
+  const TEXT_PROPS = ['title','heading','headline','name','label','prefix','value','suffix','unit','text','content','description','subtitle','tagline','caption','message','body','summary','detail','hint','note','placeholder','footer'];
+  const LOOSE_PROPS = ['value','name'];
+  const NOT_TEXT_PROPS = new Set(['key','id','className','style','href','url','src','link','image','icon','d','points','transform','viewBox','font','fontFamily','shadow','border','gradient','filter','animation','transition','__bind','__on']);
+  const notWords = s => /^[a-z][\w+.-]*:\/\/|^(?:#|rgba?\(|hsla?\(|var\(|calc\(|linear-gradient)|\b\d+(?:\.\d+)?(?:px|em|rem|vh|vw|deg|ms)\b|^[\w.-]*$/i.test(s);
+  // {line, lists}: single values for one line, and arrays (items, tags, steps) as lists.
+  function propParts(props, shown = '') {
+    const p = props || {}, line = [], lists = [], seen = [String(shown)];
+    const number = s => /^[-+]?\d[\d.,\s]*%?$/.test(s);
+    // strict: only text that reads as words; loose: words or a number.
+    const word = (v, mode) => {
+      if (typeof v === 'number') return Number.isFinite(v) && mode !== 'strict' ? String(v) : '';
+      const s = typeof v === 'string' ? v.trim() : '';
+      return s && (!mode || !notWords(s) || (mode === 'loose' && number(s))) ? s : '';
+    };
+    const item = v => v && typeof v === 'object' && !Array.isArray(v) ? propParts(v).line.join(' · ') : word(v, 'strict');
+    const keys = [...TEXT_PROPS.filter(k => k in p), ...Object.keys(p).filter(k => !TEXT_PROPS.includes(k) && !NOT_TEXT_PROPS.has(k))];
+    for (const k of keys) {
+      const v = p[k];
+      if (Array.isArray(v)) {const items = v.map(item).filter(Boolean);if (items.length) lists.push(items);continue;}
+      // A nested object with words of its own ({title, value}) reads as one more value.
+      const w = v && typeof v === 'object' ? (TEXT_PROPS.some(t => t in v) ? propParts(v).line.join(' · ') : '') : word(v, LOOSE_PROPS.includes(k) ? 'loose' : TEXT_PROPS.includes(k) ? '' : 'strict');
+      if (w) line.push(w);
+    }
+    // Text the children already show, or another value already holds ("1" next to "A. 1 倍"), is not repeated.
+    const all = [...line, ...lists.flat()];
+    const keep = (w, i, arr) => !seen.some(s => s.includes(w)) && arr.indexOf(w) === i && !all.some(o => o !== w && o.includes(w));
+    return {line:line.filter(keep), lists:lists.map(l => l.filter((w, i, arr) => arr.indexOf(w) === i)).filter(l => l.length)};
+  }
+  // An option of a kind this renderer does not know, in a radio group, is written and drawn as a
+  // radio: its value is the selection key, not text, and its other words come before its children.
+  function asRadio(c) {
+    if (!isUnknown(c)) return c;
+    const {value, ...rest} = c.props || {}, shown = textOf(c.children).trim(), {line, lists} = propParts(rest, shown), words = [...line, ...lists.flat()].join(' · ');
+    return {type:'radio', props:value === undefined ? {} : {value}, children:words ? [words, ...(shown ? [' · '] : []), ...(c.children || [])] : c.children || []};
+  }
+  // The names a tree uses that this renderer does not know, once each (drawn SVG is left out).
+  function unknownComponents(tree) {
+    const out = new Set();
+    (function walk(n) {if (!n || typeof n !== 'object') return;if (Array.isArray(n)) return n.forEach(walk);if (n.type === 'svg') return;if (isUnknown(n)) out.add(n.type);walk(n.children);})(tree);
+    return [...out].sort();
+  }
   const headingLevel = {'3xl':1, '2xl':1, xl:1, lg:2, md:3, sm:4, xs:5};
   const optionLabel = (options, value) => {const hit = (Array.isArray(options) ? options : []).find(o => (o && typeof o === 'object' ? o.value : o) === value);return hit && typeof hit === 'object' ? hit.label ?? hit.value : hit ?? value ?? '';};
   const formatNumber = value => typeof value === 'number' ? String(Math.round(value * 100) / 100) : String(value ?? '');
@@ -229,12 +398,21 @@
         case 'link': {const url = mdUrl(p.href || p.url), text = inline(node.children);return url ? `[${text || url}](${url})` : text;}
         case 'cite': {if (p.file) return t('dil.fileCite', plainMd(p.file));const items = Array.isArray(p.items) ? p.items : [];return items.length ? t('dil.cite', items.map(i => `[${plainMd(i.label)}](${mdUrl(i.url)})`).join(t('dil.sep'))) : '';}
         case 'input': case 'textarea': return t('dil.input', plainMd(p.value || p.placeholder || ''));
+        case 'date-picker': return t('dil.date', plainMd(dateText(p.value, p.placeholder)));
         case 'math': return `$${p.value ?? textOf(node.children)}$`;
         // An inline icon before the label renders as nothing; its space goes with it.
         case 'badge': return t('dil.badge', inline(node.children).trim());
         case 'icon': case 'button': return '';
-        default: return inline(node.children);
+        default: return isUnknown(node) ? [...unknownWords(node), inline(node.children)].filter(Boolean).join(' · ') : inline(node.children);
       }
+    }
+    // A component this renderer does not know: its text props (one line, then lists), then its children.
+    const unknownWords = node => {const {line, lists} = propParts(node.props, textOf(node.children));return [...line, ...lists.flat()].map(plainMd);};
+    function unknown(node, depth, ui) {
+      const {line, lists} = propParts(node.props, textOf(node.children));
+      const head = [line.map(plainMd).join(' · '), ...lists.map(l => l.map(x => `- ${plainMd(x)}`).join('\n'))].filter(Boolean).join('\n\n');
+      const body = blocks(node.children, depth, ui);
+      return head && body && !head.includes('\n') && !body.includes('\n') ? `${head} · ${body}` : [head, body].filter(Boolean).join('\n\n');
     }
     // Consecutive inline children form one paragraph; block children are separate.
     function blocks(children, depth, ui) {
@@ -248,12 +426,16 @@
       return out.join('\n\n');
     }
     function table(node) {
-      const rows = (node.children || []).filter(r => r?.type === 'table-row').map(r => (r.children || []).filter(c => c?.type === 'table-cell'));
+      // A cell with colSpan:n is followed by n-1 empty cells, so the next cell stays in its column.
+      const span = c => Math.max(1, Math.min(12, Math.floor(Number(c.props?.colSpan)) || 1));
+      // An unknown row or cell is still one: its cells, or its own text in a single cell.
+      const cellsOf = r => {const cs = (r.children || []).filter(c => c?.type === 'table-cell' || isUnknown(c));return cs.length || r.type === 'table-row' ? cs : [r];};
+      const rows = (node.children || []).filter(r => r?.type === 'table-row' || isUnknown(r)).map(r => cellsOf(r).flatMap(c => [c, ...Array(span(c) - 1).fill(null)]));
       if (!rows.length) return '';
       // GFM needs a header row; without a marked one the first row serves (cards
       // often style their header row as text instead of setting header).
-      const width = Math.max(...rows.map(r => r.length)), single = rows.length === 1 && !rows[0].some(c => c.props?.header);
-      const fill = r => {const out = r.map(c => cell(blocks(c.children)));while (out.length < width) out.push('');return out;};
+      const width = Math.max(...rows.map(r => r.length)), single = rows.length === 1 && !rows[0].some(c => c?.props?.header);
+      const fill = r => {const out = r.map(c => c ? cell(c.type === 'table-cell' ? blocks(c.children) : unknown(c, 0, false)) : '');while (out.length < width) out.push('');return out;};
       const body = single ? rows : rows.slice(1);
       const aligns = Array.from({length:width}, (_, i) => (body.find(r => r[i]) || rows[0])[i]?.props?.align);
       const line = cells => `| ${cells.join(' | ')} |`;
@@ -261,9 +443,10 @@
     }
     function list(node, depth) {
       const numbered = node.props?.marker === 'number';let n = 0;
-      return (node.children || []).filter(i => i?.type === 'list-item').map(item => {
+      return (node.children || []).filter(i => i?.type === 'list-item' || isUnknown(i)).map(item => {
         const marker = numbered ? `${++n}.` : '-', pad = ' '.repeat(marker.length + 1);
-        const kids = item.children || [], own = blocks(kids.filter(c => c?.type !== 'list'), depth).replace(/\n\n+/g, '\n');
+        const known = item.type === 'list-item', kids = known ? item.children || [] : [];
+        const own = (known ? blocks(kids.filter(c => c?.type !== 'list'), depth) : unknown(item, depth, false)).replace(/\n\n+/g, '\n');
         const nested = kids.filter(c => c?.type === 'list').map(l => list(l, depth + 1).split('\n').map(x => pad + x).join('\n'));
         // A checkbox item is a task-list item, not a bullet holding a checkbox.
         const first = `${marker} ${own.split('\n').join(`\n${pad}`)}`.replace(/^(-|\d+\.) - \[( |x)\] /, (_, m, x) => `${m} [${x}] `);
@@ -293,8 +476,9 @@
         case 'list': return list(node, depth);
         case 'blockquote': return blocks(node.children, depth, ui).split('\n').map(l => l ? `> ${l}` : '>').join('\n');
         case 'checkbox': return `- [${p.checked ? 'x' : ' '}] ${inline(node.children)}`;
-        case 'radio-group': return (node.children || []).filter(r => r?.type === 'radio').map(r => `- ${String(r.props?.value) === String(p.value) ? '(•)' : '( )'} ${inline(r.children)}`).join('\n');
-        case 'slider': return t('dil.slider', formatNumber(p.value), formatNumber(p.min ?? 0), formatNumber(p.max ?? 100));
+        case 'radio-group': return (node.children || []).map(asRadio).filter(r => r?.type === 'radio').map(r => `- ${String(r.props?.value) === String(p.value) ? '(•)' : '( )'} ${inline(r.children)}`).join('\n');
+        // Tick labels follow the value; after a full-width bracket no space is needed.
+        case 'slider': {const marks = sliderMarks(p), text = t('dil.slider', formatNumber(p.value), formatNumber(p.min ?? 0), formatNumber(p.max ?? 100));return marks.length ? `${text}${/\uff09$/.test(text) ? '' : ' '}\u00b7 ${marks.map(m => plainMd(m.label)).join(' / ')}` : text;}
         case 'segmented-control': return t('dil.options', (Array.isArray(p.options) ? p.options : []).map(o => {const label = plainMd(optionLabel([o], o?.value ?? o));return (o?.value ?? o) === p.value ? `**${label}**` : label;}).join(' / '));
         case 'select': return t('dil.select', plainMd(optionLabel(p.options, p.value)));
         case 'image': return p.src ? `![${altText(p.alt)}](${p.src})` : '';
@@ -307,7 +491,7 @@
         case 'svg': {const labels = [];(function collect(n) {if (!n || typeof n !== 'object') return;if (Array.isArray(n)) return n.forEach(collect);if (n.type === 'text' || n.type === 'tspan') {const t = textOf(n).trim();if (t) labels.push(t);return;}collect(n.children);})(node.children);return labels.length ? t('dil.diagram', labels.join(' · ')) : t('dil.diagramEmpty');}
         case 'row': {const parts = (node.children || []).map(c => isInlineNode(c) ? inline(c).trim() : block(c, depth, true).trim()).filter(Boolean);return parts.every(x => !x.includes('\n')) ? parts.join(' · ') : parts.join('\n\n');}
         case '__chatgptClientDefinedWidget': return widget(p.invocationId);
-        default: return isInlineNode(node) ? inline(node) : blocks(node.children, depth, inUi);
+        default: return isUnknown(node) ? unknown(node, depth, inUi) : isInlineNode(node) ? inline(node) : blocks(node.children, depth, inUi);
       }
     }
     return block(tree).replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
@@ -323,33 +507,71 @@
     const norm = line => line.replace(/\*\*/g, '').replace(/\[[x ]\]|\([• ]\)/g, '').replace(/\s+/g, ' ').trim();
     // Rules, and a select or tab bar echoing its own choice, carry no content.
     const choiceLine = new RegExp(`^(?:${['dil.select', 'dil.options'].map(k => t(k, '\u0001').split('\u0001')[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`);
-    const linesOf = md => md.split('\n').map(l => l.trim()).filter(l => l && !/^(---|>)$/.test(l) && !choiceLine.test(l));
-    const seen = new Set(linesOf(toMarkdown(base, {widget})).map(norm));
-    const options = value => {
-      const found = [];
-      (function walk(n) {
-        if (!n || typeof n !== 'object') return;
-        if (Array.isArray(n)) return n.forEach(walk);
+    // Compared line by line, except that a fenced code block or a $$ formula is one unit (its
+    // lines kept as written: a repeated "$$" or ");" inside must not be dropped), and a table
+    // keeps its header so the rows that changed still read as a table.
+    function unitsOf(md) {
+      const lines = md.split('\n'), out = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim(), fence = line.match(/^(`{3,}|~{3,})/);
+        if (fence || line === '$$') {
+          const close = fence ? new RegExp(`^${fence[1][0] === '`' ? '`' : '~'}{${fence[1].length},}\\s*$`) : /^\$\$$/;
+          let j = i + 1;while (j < lines.length && !close.test(lines[j].trim())) j++;
+          out.push({text:lines.slice(i, j + 1).join('\n').trim()});i = j;continue;
+        }
+        if (/^\|.*\|$/.test(line) && /^\|\s*:?-{3,}/.test((lines[i + 1] || '').trim())) {
+          let j = i + 2;while (j < lines.length && /^\|.*\|$/.test(lines[j].trim())) j++;
+          out.push({head:[line, lines[i + 1].trim()], rows:lines.slice(i + 2, j).map(l => l.trim())});i = j - 1;continue;
+        }
+        if (line && !/^(---|>)$/.test(line) && !choiceLine.test(line)) out.push({line});
+      }
+      return out;
+    }
+    // A table's first line counts too: without a header cell it is a data row.
+    const keysOf = u => u.rows ? [u.head[0], ...u.rows].map(norm) : [u.line != null ? norm(u.line) : `\u0000${u.text}`];
+    const seen = new Set(unitsOf(toMarkdown(base, {widget})).flatMap(keysOf));
+    const fresh = key => {if (!key || seen.has(key)) return false;seen.add(key);return true;};
+    // The other choices of the controls bound to a state: by the setter passed to them when the card
+    // passes it directly (onChange:setX), else by the control showing the state's current value.
+    const choicesOf = n => [...(Array.isArray(n.props?.options) ? n.props.options : []).map(o => o && typeof o === 'object' ? o.value : o), ...(n.children || []).filter(c => c?.props && 'value' in c.props && c.type !== 'text').map(c => c.props.value)];
+    // Controls by their place in the tree, to find the same control in another state's tree.
+    const controls = (tree, test) => {const out = [];(function walk(n, at) {if (!n || typeof n !== 'object') return;if (Array.isArray(n)) return n.forEach((c, i) => walk(c, `${at}.${i}`));if (test(n.props || {}, n)) out.push({n, at});walk(n.children, `${at}/`);})(tree, '');return out;};
+    const options = (key, value) => {
+      const found = [], bound = controls(base, p => p.__bind === key).map(x => x.n);
+      let hits = controls(base, (p, n) => p.value === value && n.type !== 'radio' && p.__bind == null);
+      // Several unbound controls show this value (two dropdowns both at "all"): keep the ones that
+      // follow the state when it is set to one of their other choices.
+      if (!bound.length && hits.length > 1) hits = hits.filter(({n, at}) => {
+        const other = choicesOf(n).find(v => v !== value);if (other === undefined) return false;
+        try {return controls(evaluate(dil, execute, {overrides:{[key]:other}}), () => true).find(x => x.at === at)?.n.props?.value === other;} catch {return false;}
+      });
+      for (const n of bound.length ? bound : hits.map(x => x.n)) {
         const p = n.props || {};
-        if (p.value === value && n.type !== 'radio') {
+        {
           for (const o of Array.isArray(p.options) ? p.options : []) found.push({value:o && typeof o === 'object' ? o.value : o, label:String(o && typeof o === 'object' ? o.label ?? o.value : o)});
           for (const c of n.children || []) if (c?.props && 'value' in c.props && c.type !== 'text') found.push({value:c.props.value, label:textOf(c.children).trim() || String(c.props.value)});
         }
-        walk(n.children);
-      })(base);
+      }
       return found.filter((o, i) => o.value !== value && found.findIndex(x => x.value === o.value) === i);
     };
-    const tries = [];
-    for (const s of states) {
-      if (typeof s.value === 'boolean') tries.push({key:s.key, value:!s.value, label:t(s.value ? 'dil.whenOff' : 'dil.whenOn', s.key)});
-      else if (typeof s.value === 'string') for (const o of options(s.value)) tries.push({key:s.key, value:o.value, label:t('dil.whenChosen', o.label)});
-    }
+    // Each state's tries in turn (every state's first other choice, then every second, ...), so a
+    // long dropdown cannot use up the limit before a tab bar or a switch further down is tried.
+    const perState = states.map(s => typeof s.value === 'boolean' ? [{key:s.key, value:!s.value, label:t(s.value ? 'dil.whenOff' : 'dil.whenOn', s.key)}]
+      : typeof s.value === 'string' ? options(s.key, s.value).map(o => ({key:s.key, value:o.value, label:t('dil.whenChosen', o.label)})) : []);
+    // What is tried is chosen that way; it is listed in the card's own order (a tab bar's choices together).
+    const picked = [];
+    for (let round = 0; perState.some(list => list.length > round); round++) perState.forEach((list, s) => {if (list[round]) picked.push({s, round, t:list[round]});});
+    const tries = picked.slice(0, limit).sort((a, b) => a.s - b.s || a.round - b.round).map(x => x.t);
     const out = [];
     for (const t of tries.slice(0, limit)) {
       let md;
       try {md = toMarkdown(evaluate(dil, execute, {overrides:{[t.key]:t.value}}), {widget});} catch {continue;}
-      const fresh = linesOf(md).filter(l => {const k = norm(l);if (!k || seen.has(k)) return false;seen.add(k);return true;});
-      if (fresh.length) out.push({key:t.key, value:t.value, label:t.label, md:fresh.join('\n\n')});
+      const kept = unitsOf(md).flatMap(u => {
+        if (!u.rows) return fresh(keysOf(u)[0]) ? [u.line ?? u.text] : [];
+        const headChanged = fresh(norm(u.head[0])), rows = u.rows.filter(r => fresh(norm(r)));
+        return headChanged || rows.length ? [[...u.head, ...rows].join('\n')] : [];
+      });
+      if (kept.length) out.push({key:t.key, value:t.value, label:t.label, md:kept.join('\n\n')});
     }
     return out;
   }
@@ -379,7 +601,8 @@
 .dil-root *{box-sizing:border-box;overflow-wrap:anywhere}.dil-root p{margin:0}
 .card{display:flex;flex-direction:column;gap:12px;border:1px solid rgba(13,13,13,.1);border-radius:16px;padding:12px;background:#fff}
 .box{display:flex;flex-direction:column;min-width:0}.box.dir-row{flex-direction:row}.row{display:flex;flex-direction:row;align-items:center;gap:8px;min-width:0}
-.grid{display:grid;gap:8px}[data-fill]{align-self:stretch}.grid-item{display:flex;flex-direction:column;min-width:0}.grid-item>*{flex:1 1 auto}
+.carousel{display:flex;flex-direction:row;gap:12px;overflow:hidden;min-width:0}.carousel-item{flex:none;display:flex;flex-direction:column;min-width:0;max-width:100%}mark{background:rgba(2,133,255,.13);color:inherit;border-radius:3px;padding:0 1px}
+.grid{display:grid;gap:8px}.flow{grid-auto-rows:1fr}[data-fill]{align-self:stretch}.grid-item{display:flex;flex-direction:column;min-width:0}.grid-item>*{flex:1 1 auto}
 .fs-2xs{font-size:11px;line-height:14px}.fs-xs{font-size:12px;line-height:16px}.fs-sm{font-size:14px;line-height:20px}.fs-md{font-size:16px;line-height:26px}.fs-lg{font-size:18px;line-height:28px}.fs-xl{font-size:20px;line-height:28px}
 .fw-regular{font-weight:400}.fw-medium{font-weight:500}.fw-semibold{font-weight:600}.fw-bold{font-weight:700}
 .c-secondary{color:#5d5d5d}.c-tertiary{color:#8f8f8f}.c-success{color:#2f8f46}.c-danger{color:#e02e2a}.c-warning{color:#d25e28}.c-accent,.c-info{color:#3a83f7}.tnum{font-variant-numeric:tabular-nums}
@@ -393,7 +616,7 @@
 .badge{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:9999px;font-size:12px;line-height:20px;font-weight:500;background:#f3f3f3;color:#5d5d5d;white-space:nowrap}.b-success{background:rgba(4,184,76,.15);color:#3a843f}.b-danger{background:#fff0f0;color:#e02e2a}.b-warning{background:#fdf5f1;color:#d25e28}.b-info,.b-accent{background:#e8f1fe;color:#2c67c5}
 .icon{display:inline-flex;align-items:center;justify-content:center;width:1em;line-height:1;vertical-align:-.125em}.icon svg{display:block;flex:none;width:1em;height:1em}.icon-xs{font-size:12px}.icon-sm{font-size:14px}.icon-md{font-size:16px}.icon-lg{font-size:20px}.icon-xl{font-size:24px}
 .btn{display:inline-flex;align-items:center;gap:4px;border-radius:9999px;font-size:14px;line-height:20px;font-weight:500;padding:5px 12px;white-space:nowrap;background:#0d0d0d;color:#fff;border:1px solid transparent}.btn-sm{padding:3px 10px;font-size:13px}.btn-lg{padding:8px 16px}.btn-secondary{background:#f3f3f3;color:#0d0d0d}.btn-outline{background:#fff;color:#0d0d0d;border-color:rgba(13,13,13,.15)}.btn-ghost{background:transparent;color:#0d0d0d}
-.slider{position:relative;height:20px;width:100%}.slider-track{position:absolute;left:0;right:0;top:8px;height:4px;border-radius:9999px;background:#e3e3e3}.slider-fill{position:absolute;left:0;top:8px;height:4px;border-radius:9999px;background:#0d0d0d}.slider-thumb{position:absolute;top:2px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:#fff;border:1px solid rgba(13,13,13,.15);box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.slider{position:relative;height:20px;width:100%}.slider-marks{position:relative;height:18px;margin-top:2px;font-size:12px;line-height:18px;color:#5d5d5d}.slider-marks span{position:absolute;top:0;white-space:nowrap}.slider-track{position:absolute;left:0;right:0;top:8px;height:4px;border-radius:9999px;background:#e3e3e3}.slider-fill{position:absolute;left:0;top:8px;height:4px;border-radius:9999px;background:#0d0d0d}.slider-thumb{position:absolute;top:2px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:#fff;border:1px solid rgba(13,13,13,.15);box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .seg{display:inline-flex;gap:2px;padding:2px 0}.seg-block{display:flex;width:100%}.seg-block .seg-opt{flex:1;text-align:center}.seg-opt{padding:6px 16px;border-radius:9999px;font-size:14px;line-height:20px;font-weight:500;color:#5d5d5d;white-space:nowrap}.seg-opt.on{background:#f3f3f3;color:#0d0d0d}
 .select{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:1px solid rgba(13,13,13,.15);border-radius:8px;font-size:14px;background:#fff;white-space:nowrap}
 .codeblk{margin:0;padding:10px 12px;background:#f9f9f9;border-radius:10px;overflow:hidden;white-space:pre-wrap;font:13px/1.5 ui-monospace,Consolas,monospace}.codeblk code{background:none;padding:0;font-size:inherit}
@@ -411,6 +634,9 @@ code{font-family:ui-monospace,Consolas,monospace;background:#f3f3f3;border-radiu
   function boxStyle(p) {
     const s = [], length = v => typeof v === 'number' ? `${v * 4}px` : safeCss(v);
     for (const [prop, css] of [['maxWidth','max-width'],['width','width'],['minWidth','min-width'],['height','height'],['maxHeight','max-height'],['minHeight','min-height']]) {const v = p[prop] != null && (typeof p[prop] === 'number' ? `${p[prop]}px` : safeCss(p[prop]));if (v) s.push(`${css}:${v}`);}
+    // size="10px" is a square (GPT-6.2 draws legend dots this way). Only a length counts: a
+    // card's size="md" is its padding preset.
+    if (p.size != null && p.width == null && p.height == null) {const v = typeof p.size === 'number' ? `${p.size}px` : /^\d+(\.\d+)?(px|rem|em)$/.test(String(p.size)) ? String(p.size) : null;if (v) s.push(`width:${v};height:${v};flex:none`);}
     if (p.gap != null && length(p.gap)) s.push(`gap:${length(p.gap)}`);
     if (typeof p.padding === 'number' || typeof p.padding === 'string') {const v = length(p.padding);if (v) s.push(`padding:${v}`);}
     else if (p.padding && typeof p.padding === 'object') s.push(`padding:${(p.padding.y ?? p.padding.top ?? 0) * 4}px ${(p.padding.x ?? p.padding.right ?? 0) * 4}px`);
@@ -424,6 +650,9 @@ code{font-family:ui-monospace,Consolas,monospace;background:#f3f3f3;border-radiu
     if (p.flex != null) {const n = Number(p.flex);if (Number.isFinite(n)) s.push(`flex:${n} 1 0%;min-width:0`);}
     if (typeof p.columns === 'number') s.push(`grid-template-columns:repeat(${Math.max(1, Math.min(12, Math.round(p.columns)))},minmax(0,1fr))`);
     if (p.textAlign && ['left','right','center','start','end'].includes(p.textAlign)) s.push(`text-align:${p.textAlign}`);
+    // A flow item spans columns and may keep a ratio ("2:1").
+    if (Number.isInteger(p.span) && p.span > 1) s.push(`grid-column:span ${Math.min(12, p.span)}`);
+    if (/^\d+(\.\d+)?[:/]\d+(\.\d+)?$/.test(String(p.aspectRatio ?? ''))) s.push(`aspect-ratio:${String(p.aspectRatio).replace(':', '/')}`);
     return s.length ? ` style="${s.join(';')}"` : '';
   }
   const textClasses = (p, base) => {
@@ -544,6 +773,7 @@ code{font-family:ui-monospace,Consolas,monospace;background:#f3f3f3;border-radiu
       if (node == null || node === false || node === true) return '';
       if (typeof node !== 'object') return escapeHtml(node);
       if (Array.isArray(node)) return node.map(n => walk(n, ctx)).join('');
+      if (node.type === 'radio-group' && !ctx.svg && (node.children || []).some(isUnknown)) node = {...node, children:node.children.map(asRadio)};
       const p = node.props || {}, kids = (c = ctx) => walk(node.children, c), inline = () => walk(node.children, {...ctx, inline:true});
       if (ctx.svg) {
         if (!SVG_TAGS.has(node.type)) return kids();
@@ -555,9 +785,17 @@ code{font-family:ui-monospace,Consolas,monospace;background:#f3f3f3;border-radiu
         case 'bold': return `<strong>${inline()}</strong>`;
         case 'italic': return `<em>${inline()}</em>`;
         case 'strike': case 'strikethrough': return `<s>${inline()}</s>`;
+        case 'underline': return `<u>${inline()}</u>`;
         case 'code': return `<code>${inline()}</code>`;
         case 'link': return `<span class="link">${inline()}</span>`;
         case 'input': case 'textarea': return `<span class="input${node.type === 'textarea' ? ' input-area' : ''}">${escapeHtml(p.value || p.placeholder || '')}</span>`;
+        case 'date-picker': return `<span class="select date"${p.block ? ' style="display:flex;width:100%"' : ''}><span class="icon c-secondary">${ICON_SVG.calendar ? iconSvg(ICON_SVG.calendar) : ''}</span><span>${escapeHtml(dateText(p.value, p.placeholder))}</span></span>`;
+        // A carousel is a strip of items at their own width; the card shows the first ones, as ChatGPT does.
+        case 'carousel': return `<div class="carousel"${boxStyle(p)}>${kids({...ctx, inline:false})}</div>`;
+        case 'carousel-item': return `<div class="carousel-item"${boxStyle(p)}>${kids({...ctx, inline:false})}</div>`;
+        // A flow is a grid (a "bento" of tiles); its items span columns.
+        case 'flow': return `<div class="grid flow"${boxStyle({columns:2, ...p})}>${kids({...ctx, inline:false})}</div>`;
+        case 'flow-item': return `<div class="grid-item"${boxStyle(p)}>${kids({...ctx, inline:false})}</div>`;
         case 'spacer': return '<div style="flex:1 1 auto"></div>';
         case 'col': case 'form': return `<div class="box"${boxStyle(p)}>${kids({...ctx, inline:false})}</div>`;
         // A clickable panel (a folding section's header) is a box; direction:"row" keeps its title and chevron on one line.
@@ -567,7 +805,7 @@ code{font-family:ui-monospace,Consolas,monospace;background:#f3f3f3;border-radiu
         case 'writing-block': return `<pre class="codeblk">${escapeHtml(String(p.value ?? '').trim())}</pre>`;
         case 'math': return p.block ? `<div class="math math-block">${texHtml(p.value ?? '')}</div>` : `<span class="math">${texHtml(p.value ?? '')}${inline()}</span>`;
         case 'title': return `<div class="${textClasses(p, 'title')}"${textStyle(p)}>${inline()}</div>`;
-        case 'text': return ctx.inline || p.inline ? `<span class="${textClasses(p, 't')}"${textStyle(p)}>${inline()}</span>` : `<p class="${textClasses(p, 't')}"${textStyle(p)}>${inline()}</p>`;
+        case 'text': {const body = p.highlight ? `<mark>${inline()}</mark>` : inline();return ctx.inline || p.inline ? `<span class="${textClasses(p, 't')}"${textStyle(p)}>${body}</span>` : `<p class="${textClasses(p, 't')}"${textStyle(p)}>${body}</p>`;}
         case 'caption': return ctx.inline ? `<span class="caption">${inline()}</span>` : `<p class="caption"${textStyle(p)}>${inline()}</p>`;
         case 'checkbox': return `<div class="cb"><span class="cb-box${p.checked ? ' on' : ''}">${p.checked ? '✓' : ''}</span><span>${inline()}</span></div>`;
         case 'radio-group': return `<div class="radios${p.direction === 'row' ? ' dir-row' : ''}">${kids({...ctx, radio:String(p.value ?? '')})}</div>`;
@@ -577,12 +815,12 @@ code{font-family:ui-monospace,Consolas,monospace;background:#f3f3f3;border-radiu
         case 'card': return `<div class="card"${boxStyle(p)}>${kids()}</div>`;
         case 'box': case 'row': case 'grid': case 'grid-item': {
           // An empty box is a bar segment or swatch: fill the row's height.
-          const fill = !(node.children || []).some(c => c != null && c !== false && c !== '') && p.height == null ? ' data-fill="1"' : '';
+          const fill = !(node.children || []).some(c => c != null && c !== false && c !== '') && p.height == null && p.size == null ? ' data-fill="1"' : '';
           return `<div class="${node.type}"${fill}${boxStyle(p)}>${kids({...ctx, inline:false})}</div>`;
         }
-        case 'table': return `<table class="tbl"><tbody>${kids()}</tbody></table>`;
-        case 'table-row': return `<tr>${kids()}</tr>`;
-        case 'table-cell': {const tag = p.header ? 'th' : 'td', align = p.align === 'end' || p.align === 'right' ? 'right' : p.align === 'center' ? 'center' : null;return `<${tag}${align ? ` style="text-align:${align}"` : ''}>${kids({...ctx, inline:false})}</${tag}>`;}
+        case 'table': return `<table class="tbl"><tbody>${kids({...ctx, table:'rows'})}</tbody></table>`;
+        case 'table-row': return `<tr>${kids({...ctx, table:'cells'})}</tr>`;
+        case 'table-cell': {const tag = p.header ? 'th' : 'td', cols = Math.floor(Number(p.colSpan)), align = p.align === 'end' || p.align === 'right' ? 'right' : p.align === 'center' ? 'center' : null;return `<${tag}${cols > 1 ? ` colspan="${Math.min(12, cols)}"` : ''}${align ? ` style="text-align:${align}"` : ''}>${kids({...ctx, inline:false, table:null})}</${tag}>`;}
         case 'list': {const tag = p.marker === 'number' ? 'ol' : 'ul';return `<${tag} class="lst">${kids()}</${tag}>`;}
         case 'list-item': return `<li>${kids({...ctx, inline:false})}</li>`;
         case 'blockquote': return `<blockquote class="bq">${kids()}</blockquote>`;
@@ -590,7 +828,7 @@ code{font-family:ui-monospace,Consolas,monospace;background:#f3f3f3;border-radiu
         // Lucide's vector icon when it has the name; else the old symbol, else a small dot.
         case 'icon': return `<span class="icon${p.color ? ` c-${String(p.color).replace(/[^\w-]/g, '')}` : ''}${ICON_SIZE[p.size] ? ` icon-${p.size}` : ''}">${ICON_SVG[p.name] ? iconSvg(ICON_SVG[p.name]) : ICONS[p.name] || iconSvg('<circle cx="12" cy="12" r="3" fill="currentColor"/>')}</span>`;
         case 'button': return `<span class="btn btn-${String(p.size || 'md').replace(/[^\w-]/g, '')} btn-${String(p.variant === 'outline' || p.variant === 'ghost' ? p.variant : p.color || 'primary').replace(/[^\w-]/g, '')}">${inline()}</span>`;
-        case 'slider': {const min = Number(p.min ?? 0), max = Number(p.max ?? 100), pct = max > min ? Math.max(0, Math.min(100, (Number(p.value ?? min) - min) / (max - min) * 100)) : 0;return `<div class="slider"><div class="slider-track"></div><div class="slider-fill" style="width:${pct.toFixed(2)}%"></div><div class="slider-thumb" style="left:${pct.toFixed(2)}%"></div></div>`;}
+        case 'slider': {const min = Number(p.min ?? 0), max = Number(p.max ?? 100), pct = max > min ? Math.max(0, Math.min(100, (Number(p.value ?? min) - min) / (max - min) * 100)) : 0;return `<div class="slider"><div class="slider-track"></div><div class="slider-fill" style="width:${pct.toFixed(2)}%"></div><div class="slider-thumb" style="left:${pct.toFixed(2)}%"></div></div>${marksHtml(p)}`;}
         case 'segmented-control': return `<div class="seg${p.block ? ' seg-block' : ''}">${(Array.isArray(p.options) ? p.options : []).map(o => {const value = o && typeof o === 'object' ? o.value : o;return `<span class="seg-opt${value === p.value ? ' on' : ''}">${escapeHtml(optionLabel([o], value))}</span>`;}).join('')}</div>`;
         case 'select': return `<span class="select"><span>${escapeHtml(optionLabel(p.options, p.value))}</span><span class="c-secondary">▾</span></span>`;
         case 'chart': return chartSvg(p, false);
@@ -615,7 +853,17 @@ code{font-family:ui-monospace,Consolas,monospace;background:#f3f3f3;border-radiu
         case 'image-group': return `<div class="img-row">${kids()}</div>`;
         case 'map-image': return '';
         case '__chatgptClientDefinedWidget': return `<div class="widget">${escapeHtml(t('dil.appSaved'))}</div>`;
-        default: return ctx.inline || inlineTypes.has(node.type) ? inline() : `<div>${kids()}</div>`;
+        default: {
+          if (!isUnknown(node)) return ctx.inline || inlineTypes.has(node.type) ? inline() : `<div>${kids({...ctx, table:null})}</div>`;
+          // A component this renderer does not know: its text props, then its children, so no word is lost.
+          // In a table it stands for a row (its cells, or itself in one cell) or a cell.
+          const {line, lists} = propParts(p, textOf(node.children)), sep = ' · ';
+          if (ctx.table === 'rows') return (node.children || []).some(c => c?.type === 'table-cell') ? `<tr>${kids({...ctx, table:'cells'})}</tr>` : `<tr><td>${escapeHtml([...line, ...lists.flat()].join(sep))}${kids({...ctx, table:null})}</td></tr>`;
+          if (ctx.table === 'cells') return `<td>${escapeHtml([...line, ...lists.flat()].join(sep))}${kids({...ctx, table:null})}</td>`;
+          if (ctx.inline) {const words = [...line, ...lists.flat()].join(sep), rest = inline();return escapeHtml(words) + (words && rest ? sep : '') + rest;}
+          const head = (line.length ? `<p class="t">${escapeHtml(line.join(sep))}</p>` : '') + lists.map(l => `<ul class="lst">${l.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul>`).join('');
+          return `<div>${head}${kids({...ctx, table:null})}</div>`;
+        }
       }
     }
     return walk(tree);
@@ -655,7 +903,7 @@ code{font-family:ui-monospace,Consolas,monospace;background:#f3f3f3;border-radiu
         }
         case 'slider': {
           const min = Number(p.min ?? 0), max = Number(p.max ?? 100), step = Number(p.step) > 0 ? Number(p.step) : 1, value = Number(p.value ?? min);
-          return `<input type="range" class="slider-input" min="${min}" max="${max}" step="${step}" value="${Number.isFinite(value) ? value : min}"${on(p, 'onChange')} aria-label="${escapeHtml(t('dil.sliderLabel'))}"/>`;
+          return `<input type="range" class="slider-input" min="${min}" max="${max}" step="${step}" value="${Number.isFinite(value) ? value : min}"${on(p, 'onChange')} aria-label="${escapeHtml(t('dil.sliderLabel'))}"/>${marksHtml(p)}`;
         }
         case 'segmented-control': return `<div class="seg${p.block ? ' seg-block' : ''}" role="tablist">${(Array.isArray(p.options) ? p.options : []).map(o => {const v = valueOf(o), sel = v === p.value;return `<button type="button" class="seg-opt${sel ? ' on' : ''}" role="tab" aria-selected="${sel}"${on(p, 'onChange')} data-value="${json(v)}">${escapeHtml(optionLabel([o], v))}</button>`;}).join('')}</div>`;
         case 'select': return `<select class="select-input${p.block ? ' select-block' : ''}"${on(p, 'onChange')}>${(Array.isArray(p.options) ? p.options : []).map(o => {const v = valueOf(o);return `<option data-value="${json(v)}"${v === p.value ? ' selected=""' : ''}>${escapeHtml(optionLabel([o], v))}</option>`;}).join('')}</select>`;
@@ -666,6 +914,8 @@ code{font-family:ui-monospace,Consolas,monospace;background:#f3f3f3;border-radiu
         case 'pressable': return `<div class="box pressable${p.direction === 'row' ? ' dir-row' : ''}" role="button" tabindex="0"${on(p, 'onClick')}${boxStyle(p)}>${kids({...ctx, inline:false})}</div>`;
         case 'input': return `<input type="text" class="input"${on(p, 'onChange')} value="${escapeHtml(p.value ?? '')}" placeholder="${escapeHtml(p.placeholder ?? '')}"/>`;
         case 'textarea': return `<textarea class="input input-area"${on(p, 'onChange')} placeholder="${escapeHtml(p.placeholder ?? '')}">${escapeHtml(p.value ?? '')}</textarea>`;
+        // One day ("2026-11-24") is a date input that works; a range stays as drawn text.
+        case 'date-picker': return p.value == null || p.value === '' || /^\d{4}-\d{2}-\d{2}$/.test(String(p.value)) ? `<input type="date" class="input date-input" value="${escapeHtml(p.value ?? '')}"${on(p, 'onChange')}/>` : undefined;
         case '__chatgptClientDefinedWidget': {const out = opts.widget?.(p.invocationId);return typeof out === 'string' && out ? out : undefined;}
         case 'map-image': {const out = opts.map?.(p);return typeof out === 'string' ? out : undefined;}
         // The drawn chart shows few of its numbers; the data stays one click away, as in the Markdown table.
@@ -687,6 +937,7 @@ button.seg-opt{border:0;background:transparent;font:inherit;font-size:14px;line-
 .cb-live,.rb-live,[data-on]{cursor:pointer;user-select:none}button.btn{font-family:inherit;cursor:pointer}button.btn:hover{opacity:.85}
 .pressable:hover{background-color:rgba(13,13,13,.03)}.dir-row{flex-direction:row}
 input.input,textarea.input{font:inherit;font-size:14px;color:#0d0d0d;outline:none}textarea.input{resize:vertical}
+.dil-root.live .carousel{overflow-x:auto;scroll-snap-type:x mandatory}.dil-root.live .carousel-item{scroll-snap-align:start}
 a.link{color:#2964aa}a.img-link{display:contents}.cite a{color:inherit;text-decoration:none}.cite-more{position:relative}.cite-list{display:none;position:absolute;left:0;top:100%;z-index:2;flex-direction:column;gap:2px;padding:6px 8px;background:#fff;border:1px solid rgba(13,13,13,.1);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.08)}.cite-more:hover .cite-list,.cite-more:focus-within .cite-list{display:flex}
 .math-block{display:block;text-align:center;overflow-x:auto}math{font-size:1.08em}
 .dil-toast{position:fixed;left:50%;bottom:8px;z-index:5;max-width:92%;transform:translateX(-50%);padding:6px 14px;border-radius:9999px;background:#0d0d0d;color:#fff;font-size:13px;line-height:18px;box-shadow:0 2px 10px rgba(0,0,0,.2)}
@@ -1023,10 +1274,14 @@ a.link{color:#2964aa}a.img-link{display:contents}.cite a{color:inherit;text-deco
           return items.length ? t('dil.cite', `${items.map(i => {const url = href(i.url);return url ? `<a href="${url}">${htmlText(i.label ?? '')}</a>` : htmlText(i.label ?? '');}).join(t('dil.sep'))}`) : '';
         }
         case 'badge': return t('dil.badge', inline(node.children).trim());
+        // No <u> here: CARD_HTML_TAGS keeps these cards to a few tags, so underline is plain text.
+        case 'date-picker': return t('dil.date', htmlText(dateText(p.value, p.placeholder)));
         case 'icon': return '';
-        default: return inline(node.children);
+        default: return isUnknown(node) ? [...words(node), inline(node.children)].filter(Boolean).join(' · ') : inline(node.children);
       }
     }
+    // A component this renderer does not know keeps its text props (see toMarkdown).
+    const words = node => {const {line, lists} = propParts(node.props, textOf(node.children));return [...line, ...lists.flat()].map(htmlText);};
     function blocks(children, ui) {
       const out = [];let run = [];
       const flush = () => {const text = inline(run).replace(/^(?:\s|<br\/>)+|(?:\s|<br\/>)+$/g, '');if (text) out.push(text);run = [];};
@@ -1046,7 +1301,11 @@ a.link{color:#2964aa}a.img-link{display:contents}.cite a{color:inherit;text-deco
         case 'title': {const text = inline(node.children);return `<strong>${node.props?.lineThrough && text.trim() ? `<del>${text}</del>` : text}</strong>`;}
         // As in toMarkdown: one-line parts side by side are joined with " · ".
         case 'row': {const parts = [].concat(node.children ?? []).map(c => isInlineNode(c) ? inline(c).trim() : block(c, true).trim()).filter(Boolean);return parts.join(parts.some(x => x.includes('<br/>')) ? '<br/>' : ' · ');}
-        default: return isInlineNode(node) ? inline(node) : blocks(node.children, ui || UI_CONTAINERS.has(node.type));
+        default: {
+          if (!isUnknown(node)) return isInlineNode(node) ? inline(node) : blocks(node.children, ui || UI_CONTAINERS.has(node.type));
+          const head = words(node).join(' · '), body = blocks(node.children, ui);
+          return [head, body].filter(Boolean).join(head && body && !body.includes('<br/>') ? ' · ' : '<br/>');
+        }
       }
     }
     return blocks(nodes, false);
@@ -1285,14 +1544,38 @@ a.link{color:#2964aa}a.img-link{display:contents}.cite a{color:inherit;text-deco
     // frames placed off screen, which left WebGL AppBlocks undrawn.
     frame.src = src;frame.dataset.archiveOwned = 'dil-sandbox';frame.setAttribute('aria-hidden', 'true');frame.tabIndex = -1;
     frame.style.cssText = 'position:fixed;left:0;top:0;width:760px;height:600px;border:0;opacity:0;pointer-events:none;z-index:-1';
-    const ready = new Promise((resolve, reject) => {
-      frame.addEventListener('load', () => {stats.loadMs = Math.round(performance.now() - created);resolve();}, {once:true});
-      setTimeout(() => reject(Error(t('dil.e.sandbox'))), timeout);
-    });
-    ready.catch(noop);
-    doc.documentElement.append(frame);
+    // Puts the frame in the page and waits for its page to load. Called again when the frame was
+    // taken out while an export was drawing (ChatGPT re-rendering as it settles after a navigation
+    // did this: the rest of the cards fell back to plain text, "reading 'postMessage'" of null).
+    let closed = false, attached = 0;
+    const attach = () => {
+      const loaded = new Promise((resolve, reject) => {
+        frame.addEventListener('load', () => {stats.loadMs ??= Math.round(performance.now() - created);resolve();}, {once:true});
+        setTimeout(() => reject(Error(t('dil.e.sandbox'))), timeout);
+      });
+      loaded.catch(noop);attached++;
+      doc.documentElement.append(frame);
+      return loaded;
+    };
+    let ready = attach();
+    // Waits until the frame is in the page with its page loaded, putting it back if it was removed.
+    const usable = async () => {
+      for (;;) {
+        if (closed) throw Error(t('dil.e.sandbox'));
+        if (!frame.isConnected || !frame.contentWindow) {stats.reattached = (stats.reattached || 0) + 1;ready = attach();}
+        const waitingFor = ready;await waitingFor;
+        if (waitingFor === ready && frame.isConnected && frame.contentWindow) return;
+      }
+    };
+    // A request whose frame was replaced before it answered is sent once more.
     const request = async (type, dil, extra = {}) => {
-      await ready;
+      await usable();
+      const round = attached;
+      try {return await send(type, dil, extra);}
+      catch (e) {if (closed || attached === round && frame.isConnected) throw e;await usable();return send(type, dil, extra);}
+    };
+    const send = (type, dil, extra) => {
+      if (!frame.contentWindow) return Promise.reject(Error(t('dil.e.sandbox')));
       return new Promise((resolve, reject) => {
         const channel = new MessageChannel(), timer = setTimeout(() => {channel.port1.close();reject(Error(t('dil.e.timeout')));}, timeout);
         channel.port1.onmessage = event => {clearTimeout(timer);channel.port1.close();event.data?.error ? reject(Error(event.data.error)) : resolve(event.data);};
@@ -1307,10 +1590,10 @@ a.link{color:#2964aa}a.img-link{display:contents}.cite a{color:inherit;text-deco
     // Returns {png, width, height} for one AppBlock, drawn after it has run briefly.
     evaluateRemote.appblock = block => request('appblock:preview', null, {block:{id:block.id, title:block.title, content:block.content}});
     evaluateRemote.stats = stats;
-    evaluateRemote.close = () => frame.remove();
+    evaluateRemote.close = () => {closed = true;frame.remove();};
     return evaluateRemote;
   }
-  const api = {evaluate, stateVariants, toMarkdown, segments, toHtml, texHtml, get CARD_CSS() {return cardCss();}, pageText, withImages, pictureList, validateCardHtml, markdownText, snapshotPng, appBlocks, standaloneHtml, appBlockCaptureHtml, appBlockPreview, sandboxClient,
+  const api = {evaluate, rescued, stateVariants, toMarkdown, segments, toHtml, texHtml, unknownComponents, get CARD_CSS() {return cardCss();}, pageText, withImages, pictureList, validateCardHtml, markdownText, snapshotPng, appBlocks, standaloneHtml, appBlockCaptureHtml, appBlockPreview, sandboxClient,
     // HTML export: live cards, formulas, AppBlock frames, map places, and this file's own source
     // (run again inside every card frame of the exported page).
     LIVE_CSS, mathml, mountLive, morph, appBlockFrame, appBlockFrameHtml, setFrameHeight, copyText, placeOf, source:() => `(${dilRenderModule})(globalThis);`};

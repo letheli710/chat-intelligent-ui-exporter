@@ -362,12 +362,21 @@
     if (!token) error(t('err.login'));
     const headers = {Authorization:`Bearer ${token}`}, names = new Set();
     // An item can carry the file's readable name (a card's path is still URL-encoded).
-    return pool(items, concurrency, async ({messageId, path, name: given}) => {
+    // `written` is the path as the link spells it ("data%20%231.csv"). Since 2026-11-22 the
+    // interpreter finds "data #1.csv" or "summary (final).xlsx" only under that spelling (the
+    // decoded one is a 404), while before it took the decoded one; plain names work either way.
+    // So the spelling in the link is asked first and the other forms only after a 404.
+    const decoded = p => {try {return decodeURIComponent(p);} catch {return p;}};
+    return pool(items, concurrency, async ({messageId, path, written, name: given}) => {
       try {
         signal?.throwIfAborted();
         // Charts a card shows were already downloaded to draw the card.
         const blob = cached.get(`${messageId}\n${path}`) || await (async () => {
-          const meta = await request(`/backend-api/conversation/${encodeURIComponent(conversationId)}/interpreter/download?message_id=${encodeURIComponent(messageId)}&sandbox_path=${encodeURIComponent(path)}`,{credentials:'same-origin',headers,signal});
+          let meta;
+          for (const candidate of new Set([written || path, path, decoded(path)])) {
+            meta = await request(`/backend-api/conversation/${encodeURIComponent(conversationId)}/interpreter/download?message_id=${encodeURIComponent(messageId)}&sandbox_path=${encodeURIComponent(candidate)}`,{credentials:'same-origin',headers,signal});
+            if (meta.status !== 404) break;
+          }
           if (!meta.ok) throw Error(`HTTP ${meta.status}`);
           const url = (await meta.json()).download_url;
           if (typeof url !== 'string' || !url) throw Error(t('err.noDownloadUrl'));
